@@ -1,0 +1,173 @@
+/*
+  Localizable.strings
+  MusicRegionSync
+
+  Spanish localization strings for the app.
+  This file is prepared for future localization support.
+*/
+
+// MARK: - General
+"app.name" = "MusicRegionSync";
+"button.cancel" = "Cancelar";
+"button.done" = "Listo";
+"button.retry" = "Reintentar";
+"button.accept" = "Aceptar";
+"button.delete" = "Eliminar";
+"button.save" = "Guardar";
+
+// MARK: - Tabs
+"tab.home" = "Inicio";
+"tab.favorites" = "Favoritos";
+"tab.history" = "Historial";
+
+// MARK: - Home
+"home.title" = "MusicRegionSync";
+"home.url.placeholder" = "Pega la URL de una playlist española";
+"home.url.hint" = "https://music.apple.com/es/playlist/...";
+"home.button.search" = "Buscar canciones";
+"home.button.paste" = "Pegar";
+"home.section.favorites" = "Favoritos";
+"home.section.recent" = "Recientes";
+"home.button.viewAll" = "Ver todos";
+"home.button.viewHistory" = "Ver historial";
+
+// MARK: - URL Validation
+"validation.empty" = "Pega una URL de playlist";
+"validation.malformed" = "La URL no es válida";
+"validation.notAppleMusic" = "La URL debe ser de Apple Music";
+"validation.notPlaylist" = "La URL debe ser de una playlist";
+"validation.missingId" = "No se pudo extraer el ID de la playlist";
+
+// MARK: - Sync
+"sync.title" = "Sincronizar";
+"sync.loading" = "Cargando playlist...";
+"sync.scanning" = "Escaneando canciones...";
+"sync.scanning.progress" = "%d de %d";
+"sync.searching" = "Buscando canciones en el catálogo US...";
+"sync.adding" = "Añadiendo canciones...";
+"sync.completed" = "Sincronización completada";
+"sync.songs.added" = "%d canciones añadidas";
+"sync.songs.available" = "%d/%d canciones disponibles";
+"sync.button.add" = "Añadir %d canciones";
+"sync.button.back" = "Volver al inicio";
+"sync.destination" = "Añadir a";
+"sync.destination.new" = "Nueva playlist";
+"sync.destination.select" = "Seleccionar playlist";
+"sync.destination.name" = "Nombre de la playlist";
+"sync.favorite.save" = "Guardar";
+"sync.favorite.saved" = "Guardada";
+
+// MARK: - Sync Statistics
+"stats.byIsrc" = "Por ISRC";
+"stats.byTitle" = "Por título";
+"stats.notFound" = "No encontradas";
+
+// MARK: - Song Status
+"song.status.matched" = "Disponible";
+"song.status.matchedByTitle" = "Encontrada por título";
+"song.status.notFound" = "No disponible";
+"song.status.pending" = "Pendiente";
+
+// MARK: - Favorites
+"favorites.title" = "Favoritos";
+"favorites.empty.title" = "Sin favoritos";
+"favorites.empty.message" = "Guarda tus playlists favoritas para acceder a ellas rápidamente";
+"favorites.lastSync" = "Última sync: %@";
+"favorites.songs" = "%d canciones";
+
+// MARK: - History
+"history.title" = "Historial";
+"history.empty.title" = "Sin historial";
+"history.empty.message" = "Aquí aparecerán las sincronizaciones que realices";
+"history.clear" = "Borrar todo";
+"history.clear.title" = "Borrar historial";
+"history.clear.message" = "Se eliminarán todas las entradas del historial. Esta acción no se puede deshacer.";
+"history.section.today" = "Hoy";
+"history.section.yesterday" = "Ayer";
+"history.summary" = "%d de %d canciones";
+
+// MARK: - Sync Status
+"status.completed" = "Completado";
+"status.partial" = "Parcial";
+"status.failed" = "Error";
+"status.inProgress" = "En progreso";
+
+// MARK: - Detail View
+"detail.title" = "Detalle";
+"detail.tab.all" = "Todas";
+"detail.tab.matched" = "Encontradas";
+"detail.tab.failed" = "No encontradas";
+"detail.stats.added" = "Añadidas";
+"detail.stats.failed" = "Fallidas";
+"detail.stats.total" = "Total";
+
+// MARK: - Onboarding
+"onboarding.title" = "Bienvenido a MusicRegionSync";
+"onboarding.subtitle" = "Sincroniza playlists de Apple Music España a tu cuenta US";
+"onboarding.feature1.title" = "Accede a playlists españolas";
+"onboarding.feature1.description" = "Novedades Viernes, Éxitos España y más";
+"onboarding.feature2.title" = "Sincronización automática";
+"onboarding.feature2.description" = "Encuentra las mismas canciones en tu catálogo";
+"onboarding.feature3.title" = "Guarda tus favoritas";
+"onboarding.feature3.description" = "Re-sincroniza playlists con un solo toque";
+"onboarding.button.connect" = "Conectar con Apple Music";
+"onboarding.permission.info" = "Necesitamos acceso a Apple Music para buscar y añadir canciones a tu biblioteca";
+
+// MARK: - Subscription
+"subscription.required.title" = "Suscripción requerida";
+"subscription.required.message" = "Para añadir canciones a tu biblioteca necesitas una suscripción activa a Apple Music";
+"subscription.button.subscribe" = "Suscribirse a Apple Music";
+"subscription.button.continue" = "Continuar sin suscripción";
+
+// MARK: - Settings
+"settings.title" = "Ajustes";
+"settings.section.account" = "Cuenta";
+"settings.appleMusic" = "Apple Music";
+"settings.subscription" = "Suscripción";
+"settings.connected" = "Conectado";
+"settings.notConnected" = "No conectado";
+"settings.active" = "Activa";
+"settings.notActive" = "No activa";
+"settings.section.info" = "Información";
+"settings.version" = "Versión";
+
+// MARK: - Errors
+"error.title" = "Error";
+"error.noConnection" = "Sin conexión a internet";
+"error.timeout" = "La operación tardó demasiado tiempo";
+"error.maxRetries" = "No se pudo completar la operación después de varios intentos";
+"error.notAuthorized" = "Se requiere autorización de Apple Music";
+"error.noSubscription" = "Se requiere una suscripción a Apple Music";
+"error.playlistNotFound" = "No se encontró la playlist";
+"error.noTracks" = "La playlist no contiene canciones";
+"error.songNotFound" = "No se encontró la canción";
+"error.rateLimited" = "Demasiadas solicitudes. Intenta de nuevo en unos segundos";
+"error.network" = "Error de red: %@";
+"error.unknown" = "Error desconocido: %@";
+"error.loadPlaylist" = "Error al cargar la playlist";
+"error.saveFavorite" = "No se pudo guardar como favorito";
+"error.loadFavorites" = "Error al cargar favoritos";
+"error.deleteFavorite" = "Error al eliminar favorito";
+"error.loadHistory" = "Error al cargar el historial";
+"error.deleteHistory" = "Error al eliminar entrada";
+"error.clearHistory" = "Error al limpiar historial";
+"error.invalidUrl" = "URL de playlist inválida";
+"error.noSongsToAdd" = "No hay canciones disponibles para añadir";
+
+// MARK: - Empty States
+"empty.noResults.title" = "Sin resultados";
+"empty.noResults.message" = "No se encontraron canciones disponibles en el catálogo US";
+"empty.noResults.button" = "Intentar de nuevo";
+"empty.error.title" = "Algo salió mal";
+"empty.noConnection.title" = "Sin conexión";
+"empty.noConnection.message" = "Comprueba tu conexión a internet e inténtalo de nuevo";
+"empty.noSongs.title" = "Sin canciones";
+"empty.noSongs.message" = "No hay canciones en esta categoría";
+"empty.noDetails.title" = "Sin detalles";
+"empty.noDetails.message" = "No hay información detallada disponible para esta sincronización";
+
+// MARK: - Context Menu
+"menu.viewDetail" = "Ver detalle";
+"menu.repeatSync" = "Repetir sincronización";
+"menu.removeFromFavorites" = "Quitar de favoritos";
+"menu.addToFavorites" = "Guardar en favoritos";
