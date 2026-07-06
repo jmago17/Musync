@@ -10,6 +10,7 @@
 		0A3EF4567D7F14524E12444B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3FE5FDAE85BDBD9D105E6D78 /* Foundation.framework */; };
 		27EB29B1D2605EE3267329EE /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE031A0BF95FB358473D71F7 /* Models.swift */; };
 		2AF5A22638C30AA6B21065B1 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDAE2D55D34338DB039E89B1 /* HistoryView.swift */; };
+		324E9D67DF500128F5C7F86A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DD393C48D2EF44E015C7FA9C /* Assets.xcassets */; };
 		5484BF8FD31664661A135961 /* DefaultSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB1580AB51A443ABECD18357 /* DefaultSources.swift */; };
 		77CEFE8CBDAB91FD5483A6EB /* Syncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5E25F59ABD0685ACEC270B7 /* Syncer.swift */; };
 		7988744D62D4ED15D06EF470 /* MusicSyncApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D728FEFF364DC1E40CDF4133 /* MusicSyncApp.swift */; };
@@ -25,10 +26,12 @@
 		118FA7951A209BD0A7C744EC /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RootView.swift; path = MusicSync/Views/RootView.swift; sourceTree = "<group>"; };
 		27D51401705F8030A2DF570A /* AppleMusicClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppleMusicClient.swift; path = MusicSync/Services/AppleMusicClient.swift; sourceTree = "<group>"; };
 		3FE5FDAE85BDBD9D105E6D78 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		75892293C9C504C2C47FF841 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = MusicSync/Info.plist; sourceTree = "<group>"; };
 		8F0F11A1B9737F117DEB846A /* MusicSync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusicSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB02B8EC8AD5AE7ACF6B4294 /* SourceListView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SourceListView.swift; path = MusicSync/Views/SourceListView.swift; sourceTree = "<group>"; };
 		D728FEFF364DC1E40CDF4133 /* MusicSyncApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MusicSyncApp.swift; path = MusicSync/MusicSyncApp.swift; sourceTree = "<group>"; };
 		DB1580AB51A443ABECD18357 /* DefaultSources.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DefaultSources.swift; path = MusicSync/Store/DefaultSources.swift; sourceTree = "<group>"; };
+		DD393C48D2EF44E015C7FA9C /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = MusicSync/Assets.xcassets; sourceTree = "<group>"; };
 		ECEE9F5710BF56B9E576545C /* AppStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppStore.swift; path = MusicSync/Store/AppStore.swift; sourceTree = "<group>"; };
 		EDAE2D55D34338DB039E89B1 /* HistoryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HistoryView.swift; path = MusicSync/Views/HistoryView.swift; sourceTree = "<group>"; };
 		EE031A0BF95FB358473D71F7 /* Models.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Models.swift; path = MusicSync/Models/Models.swift; sourceTree = "<group>"; };
@@ -70,6 +73,8 @@
 				118FA7951A209BD0A7C744EC /* RootView.swift */,
 				09582690A11AB339F9276193 /* SourceEditView.swift */,
 				BB02B8EC8AD5AE7ACF6B4294 /* SourceListView.swift */,
+				DD393C48D2EF44E015C7FA9C /* Assets.xcassets */,
+				75892293C9C504C2C47FF841 /* Info.plist */,
 			);
 			sourceTree = "<group>";
 		};
@@ -143,6 +148,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				324E9D67DF500128F5C7F86A /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -177,8 +183,10 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 45JJ7AM926;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MusicSync/Info.plist;
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "MusicSync sincroniza playlists públicas en tu biblioteca de Apple Music.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -320,8 +328,10 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 45JJ7AM926;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MusicSync/Info.plist;
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "MusicSync sincroniza playlists públicas en tu biblioteca de Apple Music.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
