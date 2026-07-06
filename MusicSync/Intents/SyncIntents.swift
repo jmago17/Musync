@@ -8,8 +8,9 @@ struct SyncAllPlaylistsIntent: AppIntent {
     static var description = IntentDescription(
         "Espeja todas las playlists configuradas en tu biblioteca de Apple Music.")
 
-    /// Runs in the background (no UI). If MusicKit ever fails headless, flip to true.
-    static var openAppWhenRun: Bool = false
+    /// Abre la app al ejecutarse: foreground = sin límite de tiempo de background y
+    /// MusicKit funciona con fiabilidad (en background daba timeout / fallaba).
+    static var openAppWhenRun: Bool = true
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         guard MusicAuthorization.currentStatus == .authorized else {
@@ -55,7 +56,7 @@ struct SyncPlaylistIntent: AppIntent {
     static var title: LocalizedStringResource = "Sincronizar una playlist"
     static var description = IntentDescription(
         "Espeja una playlist concreta en tu biblioteca de Apple Music.")
-    static var openAppWhenRun: Bool = false
+    static var openAppWhenRun: Bool = true
 
     @Parameter(title: "Playlist")
     var playlist: PlaylistEntity
