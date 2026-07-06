@@ -26,15 +26,74 @@ struct SyncAllPlaylistsIntent: AppIntent {
     }
 }
 
+// MARK: - Sync a single, selectable playlist
+
+/// A configured playlist, exposed to Shortcuts so it can be picked as a parameter.
+struct PlaylistEntity: AppEntity, Identifiable {
+    var id: String        // SavedSource.id.uuidString
+    var name: String
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Playlist"
+    var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(name)") }
+    static var defaultQuery = PlaylistQuery()
+}
+
+struct PlaylistQuery: EntityQuery {
+    func entities(for identifiers: [String]) async throws -> [PlaylistEntity] {
+        SourceStore.loadSources()
+            .filter { identifiers.contains($0.id.uuidString) }
+            .map { PlaylistEntity(id: $0.id.uuidString, name: $0.targetName) }
+    }
+    func suggestedEntities() async throws -> [PlaylistEntity] {
+        SourceStore.loadSources().map { PlaylistEntity(id: $0.id.uuidString, name: $0.targetName) }
+    }
+}
+
+/// Shortcuts action: sync one chosen playlist. Ligero → cabe en el presupuesto de
+/// tiempo de una automatización (a diferencia de "todas de golpe").
+struct SyncPlaylistIntent: AppIntent {
+    static var title: LocalizedStringResource = "Sincronizar una playlist"
+    static var description = IntentDescription(
+        "Espeja una playlist concreta en tu biblioteca de Apple Music.")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Playlist")
+    var playlist: PlaylistEntity
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Sincronizar \(\.$playlist)")
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard MusicAuthorization.currentStatus == .authorized else {
+            return .result(dialog: "Abre MusicSync y autoriza Apple Music antes de automatizar.")
+        }
+        guard let run = await SyncService.syncOne(id: playlist.id) else {
+            return .result(dialog: "No encontré esa playlist.")
+        }
+        let dialog = run.failed
+            ? (run.errorMessage ?? "Error al sincronizar.")
+            : "\(run.targetName): \(run.matched)/\(run.totalTracks) canciones."
+        return .result(dialog: IntentDialog(stringLiteral: dialog))
+    }
+}
+
 struct MusicSyncShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: SyncPlaylistIntent(),
+            phrases: [
+                "Sincronizar \(\.$playlist) con \(.applicationName)",
+            ],
+            shortTitle: "Sincronizar playlist",
+            systemImageName: "music.note.list")
         AppShortcut(
             intent: SyncAllPlaylistsIntent(),
             phrases: [
                 "Sincronizar playlists con \(.applicationName)",
                 "Sincroniza mi música con \(.applicationName)",
             ],
-            shortTitle: "Sincronizar playlists",
+            shortTitle: "Sincronizar todas",
             systemImageName: "arrow.triangle.2.circlepath")
     }
 }

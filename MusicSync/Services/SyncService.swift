@@ -11,6 +11,24 @@ struct SyncService: Sendable {
         var playlists: Int = 0
     }
 
+    /// Sync a single configured source by id. Returns nil if not found.
+    static func syncOne(id: String) async -> SyncRun? {
+        var sources = SourceStore.loadSources()
+        guard let idx = sources.firstIndex(where: { $0.id.uuidString == id }) else { return nil }
+        var history = SourceStore.loadHistory()
+        let run = await Syncer().run(source: sources[idx]) { _ in }
+        history.insert(run, at: 0)
+        if !run.failed {
+            sources[idx].lastPlaylistID = run.playlistID
+            sources[idx].lastSyncedAt = run.date
+            sources[idx].lastMatched = run.matched
+            sources[idx].lastMissed = run.misses.count
+            SourceStore.saveSources(sources)
+        }
+        SourceStore.saveHistory(history)
+        return run
+    }
+
     static func syncAll() async -> Summary {
         var sources = SourceStore.loadSources()
         var history = SourceStore.loadHistory()
