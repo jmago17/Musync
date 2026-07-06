@@ -44,7 +44,9 @@ struct AppleMusicClient: Sendable {
         guard var comps = URLComponents(string: Self.host + path) else {
             throw ClientError.badURL(path)
         }
-        comps.queryItems = query
+        // Preserva la query que ya venga en `path` (p.ej. el `next` de paginación)
+        // y añade los items extra, en vez de sobrescribirla.
+        if let query { comps.queryItems = (comps.queryItems ?? []) + query }
         guard let url = comps.url else { throw ClientError.badURL(path) }
 
         var req = URLRequest(url: url)
@@ -68,14 +70,14 @@ struct AppleMusicClient: Sendable {
                                        path: String,
                                        query: [URLQueryItem]? = nil) async throws -> T {
         let data = try await rawData(method: "GET", path: path, query: query)
-        return try decode(type, data)
+        return try decode(type, data, context: path)
     }
 
-    private func decode<T: Decodable>(_ type: T.Type, _ data: Data) throws -> T {
+    private func decode<T: Decodable>(_ type: T.Type, _ data: Data, context: String = "") throws -> T {
         do { return try JSONDecoder().decode(type, from: data) }
         catch {
-            let preview = String(data: data.prefix(300), encoding: .utf8) ?? "<binario>"
-            throw ClientError.decode(preview)
+            let preview = String(data: data.prefix(200), encoding: .utf8) ?? "<binario>"
+            throw ClientError.decode("\(context) → \(preview)")
         }
     }
 
@@ -222,7 +224,7 @@ struct AppleMusicClient: Sendable {
         let data = try await rawData(method: "POST",
                                      path: "/v1/me/library/playlists",
                                      body: try JSONEncoder().encode(body))
-        let resp = try decode(DataArray<EmptyAttrs>.self, data)
+        let resp = try decode(DataArray<EmptyAttrs>.self, data, context: "POST /v1/me/library/playlists")
         guard let pid = resp.data.first?.id else { throw ClientError.decode("sin id de playlist") }
         if !rest.isEmpty { try await addTracks(playlistID: pid, songIDs: rest) }
         return pid
