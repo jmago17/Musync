@@ -117,13 +117,15 @@ final class AppStore {
         isLoadingLibrary = false
     }
 
-    /// Crea una playlist vacía en la biblioteca y la deja seleccionable al vuelo.
+    /// Crea una playlist vacía en la biblioteca. **No** se usa desde el selector
+    /// (allí la creación se difiere al primer sync para no dejar playlists
+    /// vacías); se mantiene por si hace falta creación explícita.
     func createLibraryPlaylist(named name: String) async -> LibraryPlaylist? {
         do {
             let id = try await client.createPlaylist(name: name,
                                                      description: "Creada desde MusicSync",
                                                      songIDs: [])
-            let pl = LibraryPlaylist(id: id, name: name, trackCount: 0)
+            let pl = LibraryPlaylist(id: id, name: name, trackCount: 0, isReplaceable: true)
             libraryPlaylists.append(pl)
             libraryPlaylists.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
             return pl

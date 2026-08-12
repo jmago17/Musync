@@ -12,6 +12,15 @@ struct SourceEditView: View {
 
     private var progress: SyncProgress? { store.progress[draft.id] }
 
+    /// ¿Puede MusicSync reemplazar el contenido del destino elegido?
+    /// Si aún no hay destino (se creará en el primer sync) sí podrá, porque la
+    /// habrá creado esta app.
+    private var canReplace: Bool {
+        guard let id = draft.lastPlaylistID else { return true }
+        guard let pl = store.libraryPlaylists.first(where: { $0.id == id }) else { return true }
+        return pl.isReplaceable
+    }
+
     var body: some View {
         Form {
             Section("Playlist destino") {
@@ -40,8 +49,16 @@ struct SourceEditView: View {
                     ForEach(SyncMode.allCases) { Text($0.label).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                .disabled(!canReplace)
                 .onChange(of: draft.mode) { store.updateSource(draft) }
                 Text(draft.mode.help).font(.caption).foregroundStyle(.secondary)
+
+                if !canReplace, draft.lastPlaylistID != nil {
+                    Label("Esta playlist la creaste tú (o la app Música), así que Apple no permite reemplazar su contenido desde otra app. Solo se pueden añadir canciones nuevas.",
+                          systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section("Origen") {
@@ -111,8 +128,12 @@ struct SourceEditView: View {
         }
         .onChange(of: draft.lastPlaylistID) {
             draft.lastPlaylistName = draft.targetName
+            // Si el destino no admite reemplazo, cae a "Añadir" en vez de fallar
+            // en mitad del sync.
+            if !canReplace { draft.mode = .append }
             store.updateSource(draft)
         }
+        .task { await store.loadLibraryPlaylists() }
     }
 }
 

@@ -15,6 +15,7 @@ struct AppleMusicClient: Sendable {
         case http(Int, String)
         case decode(String)
         case notAuthorized
+        case notEditable(String)
 
         var errorDescription: String? {
             switch self {
@@ -22,6 +23,7 @@ struct AppleMusicClient: Sendable {
             case .http(let c, let m): return "Apple Music API \(c): \(m)"
             case .decode(let m):     return "Respuesta inesperada: \(m)"
             case .notAuthorized:     return "Autoriza el acceso a Apple Music primero."
+            case .notEditable(let m): return m
             }
         }
     }
@@ -195,6 +197,11 @@ struct AppleMusicClient: Sendable {
 
     /// Todas las playlists de la biblioteca, con metadatos suficientes para
     /// mostrarlas en un selector de destino.
+    ///
+    /// `canEdit` (REST) indica si la playlist admite añadir pistas. Además
+    /// consultamos vía MusicKit `isEditable`, que es lo que de verdad determina
+    /// si `MusicLibrary.edit` puede reemplazar su contenido (solo playlists
+    /// creadas por esta app).
     func libraryPlaylistsDetailed() async throws -> [LibraryPlaylist] {
         var out: [LibraryPlaylist] = []
         var path: String? = "/v1/me/library/playlists"
@@ -210,6 +217,13 @@ struct AppleMusicClient: Sendable {
             })
             path = page.next
         }
+
+        // Marca cuáles puede reemplazar MusicSync (las que ha creado la app).
+        let owned = CreatedPlaylists.ids
+        for i in out.indices {
+            out[i].isReplaceable = owned.contains(out[i].id)
+        }
+
         return out.sorted {
             $0.name.localizedStandardCompare($1.name) == .orderedAscending
         }
@@ -252,29 +266,43 @@ struct AppleMusicClient: Sendable {
                                      body: try JSONEncoder().encode(body))
         let resp = try decode(DataArray<EmptyAttrs>.self, data, context: "POST /v1/me/library/playlists")
         guard let pid = resp.data.first?.id else { throw ClientError.decode("sin id de playlist") }
+        CreatedPlaylists.remember(pid)
         if !rest.isEmpty { try await addTracks(playlistID: pid, songIDs: rest) }
         return pid
     }
 
-    /// Renombra (y actualiza la descripción de) una playlist existente de la
-    /// biblioteca, en vez de crear otra nueva. Requiere iOS 17+ en el backend.
-    func renamePlaylist(_ id: String, name: String, description: String) async throws {
-        let body = EditPlaylistBody(attributes: .init(name: name, description: description))
-        _ = try await rawData(method: "PATCH",
-                              path: "/v1/me/library/playlists/\(id)",
-                              body: try JSONEncoder().encode(body))
-    }
+    /// Renombra y/o reconstruye el contenido de una playlist **creada por esta
+    /// app**, conservando su id. Usa MusicKit (`MusicLibrary.edit`) porque la
+    /// Apple Music API REST **no tiene** endpoint de edición: solo POST para
+    /// crear y POST /tracks para añadir al final.
+    ///
+    /// Lanza si la playlist la creó otra app (p. ej. la app Música): en ese caso
+    /// Apple no permite editarla desde aquí por ninguna API pública.
+    func editOwnPlaylist(id: String, name: String, description: String, songIDs: [String]) async throws {
+        let all = try await MusicLibraryRequest<Playlist>().response().items
+        guard let playlist = all.first(where: { $0.id.rawValue == id }) else {
+            throw ClientError.notEditable("la playlist ya no está en tu biblioteca")
+        }
+        var songs: [Song] = []
+        for chunk in songIDs.chunked(25) {
+            let r = MusicCatalogResourceRequest<Song>(matching: \.id,
+                                                      memberOf: chunk.map { MusicItemID($0) })
+            songs.append(contentsOf: try await r.response().items)
+        }
+        // Reordena según el orden del origen.
+        let order = Dictionary(uniqueKeysWithValues: songIDs.enumerated().map { ($1, $0) })
+        songs.sort { (order[$0.id.rawValue] ?? 0) < (order[$1.id.rawValue] ?? 0) }
 
-    /// Sustituye por completo el contenido de una playlist existente,
-    /// conservando su id (y por tanto la playlist que el usuario ya tiene).
-    func replaceTracks(playlistID: String, songIDs: [String]) async throws {
-        let initial = Array(songIDs.prefix(100))
-        let rest = Array(songIDs.dropFirst(100))
-        let body = TrackDataBody(data: initial.map { .init(id: $0) })
-        _ = try await rawData(method: "PUT",
-                              path: "/v1/me/library/playlists/\(playlistID)/tracks",
-                              body: try JSONEncoder().encode(body))
-        if !rest.isEmpty { try await addTracks(playlistID: playlistID, songIDs: rest) }
+        do {
+            _ = try await MusicLibrary.shared.edit(playlist,
+                                                   name: name,
+                                                   description: description,
+                                                   items: songs)
+        } catch {
+            // `MusicLibrary.edit` falla si la playlist la creó otra app.
+            throw ClientError.notEditable(
+                "No se puede reemplazar el contenido de «\(playlist.name)»: Apple solo permite editar playlists creadas por MusicSync. Cambia el modo a «Añadir» o elige otro destino.")
+        }
     }
 
     func addTracks(playlistID: String, songIDs: [String]) async throws {
@@ -284,10 +312,6 @@ struct AppleMusicClient: Sendable {
                                   path: "/v1/me/library/playlists/\(playlistID)/tracks",
                                   body: try JSONEncoder().encode(body))
         }
-    }
-
-    func deletePlaylist(_ id: String) async throws {
-        _ = try await rawData(method: "DELETE", path: "/v1/me/library/playlists/\(id)")
     }
 
     /// Catalog ids already present in a library playlist, for dedupe on append.
@@ -379,10 +403,6 @@ private struct CreatePlaylistBody: Encodable {
     struct TrackData: Encodable { let data: [SongRef] }
 }
 private struct TrackDataBody: Encodable { let data: [SongRef] }
-private struct EditPlaylistBody: Encodable {
-    let attributes: Attrs
-    struct Attrs: Encodable { let name: String; let description: String }
-}
 private struct SongRef: Encodable {
     let id: String
     let type = "songs"

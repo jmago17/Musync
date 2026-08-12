@@ -109,32 +109,23 @@ struct Syncer: Sendable {
                        targetName: String,
                        description: String,
                        songIDs: [String]) async throws -> String {
+        // Sin destino conocido: crear es la única opción legítima.
         guard let existing else {
             return try await client.createPlaylist(name: targetName,
                                                    description: description,
                                                    songIDs: songIDs)
         }
 
-        // Si el nombre destino cambió, RENOMBRAR la playlist existente en vez de
-        // crear una nueva. Si la API no lo permite, seguimos usando la misma.
-        try? await client.renamePlaylist(existing, name: targetName, description: description)
-
         switch mode {
         case .replace:
-            do {
-                try await client.replaceTracks(playlistID: existing, songIDs: songIDs)
-                return existing
-            } catch {
-                // Backend sin PUT de tracks → borrar y recrear (comportamiento CLI).
-                do {
-                    try await client.deletePlaylist(existing)
-                } catch {
-                    return try await appendDedupe(existing, songIDs: songIDs)
-                }
-                return try await client.createPlaylist(name: targetName,
-                                                       description: description,
-                                                       songIDs: songIDs)
-            }
+            // Reemplazar SOLO es posible en playlists creadas por esta app
+            // (limitación de `MusicLibrary.edit`). Si no se puede, se informa
+            // del error — NUNCA se borra ni se crea un duplicado.
+            try await client.editOwnPlaylist(id: existing,
+                                             name: targetName,
+                                             description: description,
+                                             songIDs: songIDs)
+            return existing
 
         case .append:
             return try await appendDedupe(existing, songIDs: songIDs)

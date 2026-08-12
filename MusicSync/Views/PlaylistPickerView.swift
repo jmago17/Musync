@@ -32,18 +32,20 @@ struct PlaylistPickerView: View {
                     HStack {
                         TextField("Nombre de la nueva playlist", text: $newName)
                         Button {
-                            Task {
-                                creating = true
-                                if let pl = await store.createLibraryPlaylist(named: newName.trimmed) {
-                                    select(pl)
-                                }
-                                creating = false
-                            }
+                            // No se crea nada aquí: se registra la intención y la
+                            // playlist se crea en el primer sync, ya con canciones.
+                            // Así no quedan playlists vacías si te arrepientes.
+                            selectedID = nil
+                            selectedName = newName.trimmed
+                            dismiss()
                         } label: {
-                            if creating { ProgressView() } else { Image(systemName: "plus.circle.fill") }
+                            Image(systemName: "plus.circle.fill")
                         }
-                        .disabled(newName.trimmed.isEmpty || creating)
+                        .disabled(newName.trimmed.isEmpty)
                     }
+                    Text("Se creará en tu biblioteca durante la primera sincronización.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("En tu biblioteca") {
@@ -71,6 +73,11 @@ struct PlaylistPickerView: View {
                                         .lineLimit(1)
                                     if !pl.canEdit {
                                         Text("Solo lectura — no se puede modificar")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    } else if !pl.isReplaceable {
+                                        Label("Solo permite añadir canciones",
+                                              systemImage: "plus.circle")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }

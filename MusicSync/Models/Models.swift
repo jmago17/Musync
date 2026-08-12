@@ -65,7 +65,10 @@ struct LibraryPlaylist: Codable, Hashable, Identifiable, Sendable {
     var id: String
     var name: String
     var trackCount: Int?
+    /// La API permite añadir pistas.
     var canEdit: Bool = true
+    /// MusicSync puede REEMPLAZAR su contenido (solo si la creó esta app).
+    var isReplaceable: Bool = false
 }
 
 // MARK: - Catalog match
