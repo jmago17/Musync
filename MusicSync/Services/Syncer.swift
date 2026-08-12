@@ -86,10 +86,22 @@ struct Syncer: Sendable {
     }
 
     private func resolveExistingID(_ source: SavedSource, targetName: String) async throws -> String? {
+        // 1) Id cacheado del último sync: es la referencia fuerte y sobrevive a
+        //    un cambio de nombre del destino.
         if let cached = source.lastPlaylistID, try await client.playlistExists(cached) {
             return cached
         }
-        return try await client.findPlaylist(named: targetName)
+        // 2) Nombre actual (comparación tolerante a mayúsculas/acentos).
+        if let byName = try await client.findPlaylist(named: targetName) {
+            return byName
+        }
+        // 3) Nombre que tenía el destino en el último sync: cubre el caso de
+        //    renombrar en la app cuando el id cacheado se ha perdido.
+        if let previous = source.lastPlaylistName, previous != targetName,
+           let byPrevious = try await client.findPlaylist(named: previous) {
+            return byPrevious
+        }
+        return nil
     }
 
     private func write(mode: SyncMode,
@@ -97,23 +109,35 @@ struct Syncer: Sendable {
                        targetName: String,
                        description: String,
                        songIDs: [String]) async throws -> String {
+        guard let existing else {
+            return try await client.createPlaylist(name: targetName,
+                                                   description: description,
+                                                   songIDs: songIDs)
+        }
+
+        // Si el nombre destino cambió, RENOMBRAR la playlist existente en vez de
+        // crear una nueva. Si la API no lo permite, seguimos usando la misma.
+        try? await client.renamePlaylist(existing, name: targetName, description: description)
+
         switch mode {
         case .replace:
-            if let existing {
+            do {
+                try await client.replaceTracks(playlistID: existing, songIDs: songIDs)
+                return existing
+            } catch {
+                // Backend sin PUT de tracks → borrar y recrear (comportamiento CLI).
                 do {
                     try await client.deletePlaylist(existing)
                 } catch {
-                    // Delete not allowed → fall back to append + dedupe (CLI behaviour).
                     return try await appendDedupe(existing, songIDs: songIDs)
                 }
+                return try await client.createPlaylist(name: targetName,
+                                                       description: description,
+                                                       songIDs: songIDs)
             }
-            return try await client.createPlaylist(name: targetName, description: description, songIDs: songIDs)
 
         case .append:
-            if let existing {
-                return try await appendDedupe(existing, songIDs: songIDs)
-            }
-            return try await client.createPlaylist(name: targetName, description: description, songIDs: songIDs)
+            return try await appendDedupe(existing, songIDs: songIDs)
         }
     }
 

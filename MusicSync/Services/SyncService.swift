@@ -20,6 +20,7 @@ struct SyncService: Sendable {
         history.insert(run, at: 0)
         if !run.failed {
             sources[idx].lastPlaylistID = run.playlistID
+            sources[idx].lastPlaylistName = run.targetName
             sources[idx].lastSyncedAt = run.date
             sources[idx].lastMatched = run.matched
             sources[idx].lastMissed = run.misses.count
@@ -44,6 +45,7 @@ struct SyncService: Sendable {
                 summary.ok += 1
                 summary.matched += run.matched
                 sources[i].lastPlaylistID = run.playlistID
+                sources[i].lastPlaylistName = run.targetName
                 sources[i].lastSyncedAt = run.date
                 sources[i].lastMatched = run.matched
                 sources[i].lastMissed = run.misses.count

@@ -202,8 +202,21 @@ struct AppleMusicClient: Sendable {
         return out
     }
 
+    /// Normaliza para comparar nombres: sin mayúsculas, sin acentos y con
+    /// espacios colapsados. Evita crear duplicados por diferencias cosméticas.
+    static func normalizedName(_ s: String) -> String {
+        s.folding(options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive],
+                  locale: Locale(identifier: "es_ES"))
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     func findPlaylist(named name: String) async throws -> String? {
-        try await libraryPlaylists().first(where: { $0.name == name })?.id
+        let all = try await libraryPlaylists()
+        if let exact = all.first(where: { $0.name == name })?.id { return exact }
+        let target = Self.normalizedName(name)
+        guard !target.isEmpty else { return nil }
+        return all.first(where: { Self.normalizedName($0.name) == target })?.id
     }
 
     func playlistExists(_ id: String) async throws -> Bool {
@@ -228,6 +241,27 @@ struct AppleMusicClient: Sendable {
         guard let pid = resp.data.first?.id else { throw ClientError.decode("sin id de playlist") }
         if !rest.isEmpty { try await addTracks(playlistID: pid, songIDs: rest) }
         return pid
+    }
+
+    /// Renombra (y actualiza la descripción de) una playlist existente de la
+    /// biblioteca, en vez de crear otra nueva. Requiere iOS 17+ en el backend.
+    func renamePlaylist(_ id: String, name: String, description: String) async throws {
+        let body = EditPlaylistBody(attributes: .init(name: name, description: description))
+        _ = try await rawData(method: "PATCH",
+                              path: "/v1/me/library/playlists/\(id)",
+                              body: try JSONEncoder().encode(body))
+    }
+
+    /// Sustituye por completo el contenido de una playlist existente,
+    /// conservando su id (y por tanto la playlist que el usuario ya tiene).
+    func replaceTracks(playlistID: String, songIDs: [String]) async throws {
+        let initial = Array(songIDs.prefix(100))
+        let rest = Array(songIDs.dropFirst(100))
+        let body = TrackDataBody(data: initial.map { .init(id: $0) })
+        _ = try await rawData(method: "PUT",
+                              path: "/v1/me/library/playlists/\(playlistID)/tracks",
+                              body: try JSONEncoder().encode(body))
+        if !rest.isEmpty { try await addTracks(playlistID: playlistID, songIDs: rest) }
     }
 
     func addTracks(playlistID: String, songIDs: [String]) async throws {
@@ -328,6 +362,10 @@ private struct CreatePlaylistBody: Encodable {
     struct TrackData: Encodable { let data: [SongRef] }
 }
 private struct TrackDataBody: Encodable { let data: [SongRef] }
+private struct EditPlaylistBody: Encodable {
+    let attributes: Attrs
+    struct Attrs: Encodable { let name: String; let description: String }
+}
 private struct SongRef: Encodable {
     let id: String
     let type = "songs"

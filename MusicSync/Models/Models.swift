@@ -33,6 +33,10 @@ struct SavedSource: Identifiable, Codable, Hashable, Sendable {
     var mode: SyncMode = .replace
     /// Library playlist id from the last successful sync (dodges indexing latency).
     var lastPlaylistID: String? = nil
+    /// Name the destination playlist had after the last successful sync. Permite
+    /// reencontrar la playlist cuando el usuario cambia `targetName` y el id
+    /// cacheado se ha perdido (reinstalación, otro dispositivo…).
+    var lastPlaylistName: String? = nil
     var lastSyncedAt: Date? = nil
     var lastMatched: Int? = nil
     var lastMissed: Int? = nil

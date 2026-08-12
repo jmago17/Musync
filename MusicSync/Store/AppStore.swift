@@ -125,6 +125,7 @@ final class AppStore {
         persistHistory()
         if !run.failed, var s = sources.first(where: { $0.id == source.id }) {
             s.lastPlaylistID = run.playlistID
+            s.lastPlaylistName = run.targetName
             s.lastSyncedAt = run.date
             s.lastMatched = run.matched
             s.lastMissed = run.misses.count
