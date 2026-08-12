@@ -57,6 +57,17 @@ struct SourcePlaylist: Sendable {
     var tracks: [SourceTrack]
 }
 
+// MARK: - Library playlist (destino)
+
+/// Una playlist que ya existe en la biblioteca del usuario, para elegirla
+/// como destino en vez de escribir el nombre a mano.
+struct LibraryPlaylist: Codable, Hashable, Identifiable, Sendable {
+    var id: String
+    var name: String
+    var trackCount: Int?
+    var canEdit: Bool = true
+}
+
 // MARK: - Catalog match
 
 struct CatalogSong: Codable, Hashable, Identifiable, Sendable {

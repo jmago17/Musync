@@ -6,6 +6,7 @@ struct SourceEditView: View {
 
     @State private var draft: SavedSource
     @State private var lastRun: SyncRun?
+    @State private var showPicker = false
 
     init(source: SavedSource) { _draft = State(initialValue: source) }
 
@@ -13,9 +14,25 @@ struct SourceEditView: View {
 
     var body: some View {
         Form {
-            Section("Nombre destino") {
-                TextField("Nombre en tu biblioteca", text: $draft.targetName)
-                    .onChange(of: draft.targetName) { store.updateSource(draft) }
+            Section("Playlist destino") {
+                Button { showPicker = true } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(draft.targetName.isEmpty ? "Elegir playlist…" : draft.targetName)
+                                .foregroundStyle(draft.targetName.isEmpty ? .secondary : .primary)
+                            if draft.lastPlaylistID != nil {
+                                Text("Vinculada a tu biblioteca")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
             }
 
             Section("Modo") {
@@ -86,6 +103,16 @@ struct SourceEditView: View {
         }
         .navigationTitle(draft.targetName)
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showPicker) {
+            PlaylistPickerView(selectedID: Binding(
+                get: { draft.lastPlaylistID },
+                set: { draft.lastPlaylistID = $0 }
+            ), selectedName: $draft.targetName)
+        }
+        .onChange(of: draft.lastPlaylistID) {
+            draft.lastPlaylistName = draft.targetName
+            store.updateSource(draft)
+        }
     }
 }
 
@@ -95,8 +122,11 @@ struct AddSourceSheet: View {
 
     @State private var url = ""
     @State private var name = ""
+    @State private var targetID: String?
     @State private var mode: SyncMode = .replace
     @State private var probing = false
+    @State private var showPicker = false
+    @State private var suggestedName = ""
     @State private var error: String?
 
     private var validURL: Bool { AppleMusicClient.parseSourceURL(url) != nil }
@@ -112,8 +142,12 @@ struct AddSourceSheet: View {
                     Button {
                         Task {
                             probing = true; error = nil
-                            if let t = await store.peekTitle(url: url), name.isEmpty { name = t }
-                            if name.isEmpty { error = "No pude leer la playlist. Revisa la URL." }
+                            if let t = await store.peekTitle(url: url) {
+                                suggestedName = t
+                                showPicker = true
+                            } else {
+                                error = "No pude leer la playlist. Revisa la URL."
+                            }
                             probing = false
                         }
                     } label: {
@@ -122,8 +156,21 @@ struct AddSourceSheet: View {
                     .disabled(!validURL || probing)
                 }
 
-                Section("Nombre destino") {
-                    TextField("Nombre en tu biblioteca", text: $name)
+                Section("Playlist destino") {
+                    Button { showPicker = true } label: {
+                        HStack {
+                            Text(name.isEmpty ? "Elegir playlist de tu biblioteca…" : name)
+                                .foregroundStyle(name.isEmpty ? .secondary : .primary)
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    Text("Elige una playlist existente o crea una nueva desde el selector.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("Modo") {
@@ -148,11 +195,18 @@ struct AddSourceSheet: View {
                     Button("Añadir") {
                         store.addSource(.init(sourceURL: url,
                                               targetName: name.isEmpty ? "Nueva playlist" : name,
-                                              mode: mode))
+                                              mode: mode,
+                                              lastPlaylistID: targetID,
+                                              lastPlaylistName: name.isEmpty ? nil : name))
                         dismiss()
                     }
-                    .disabled(!validURL)
+                    .disabled(!validURL || targetID == nil)
                 }
+            }
+            .sheet(isPresented: $showPicker) {
+                PlaylistPickerView(selectedID: $targetID,
+                                   selectedName: $name,
+                                   suggestedName: suggestedName)
             }
         }
     }

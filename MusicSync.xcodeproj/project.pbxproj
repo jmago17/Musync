@@ -17,6 +17,7 @@
 		7988744D62D4ED15D06EF470 /* MusicSyncApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D728FEFF364DC1E40CDF4133 /* MusicSyncApp.swift */; };
 		A9FB3BD3F8A0C77B40C42C07 /* AppleMusicClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27D51401705F8030A2DF570A /* AppleMusicClient.swift */; };
 		CD100FC3F0445BEE79E6D037 /* SourceEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09582690A11AB339F9276193 /* SourceEditView.swift */; };
+		AA11BB22CC33DD44EE55FF01 /* PlaylistPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF02 /* PlaylistPickerView.swift */; };
 		CEF439381493C5AF4407CD36 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C891F0F744EC2C06C9F3A39C /* SyncService.swift */; };
 		EF560D2027DA73F4333598E3 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 118FA7951A209BD0A7C744EC /* RootView.swift */; };
 		F16F8197B6E52CA10E5C51E5 /* SourceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68E8DBD124DB652BE1509AA4 /* SourceStore.swift */; };
@@ -26,6 +27,7 @@
 
 /* Begin PBXFileReference section */
 		09582690A11AB339F9276193 /* SourceEditView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SourceEditView.swift; path = MusicSync/Views/SourceEditView.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE55FF02 /* PlaylistPickerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PlaylistPickerView.swift; path = MusicSync/Views/PlaylistPickerView.swift; sourceTree = "<group>"; };
 		118FA7951A209BD0A7C744EC /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RootView.swift; path = MusicSync/Views/RootView.swift; sourceTree = "<group>"; };
 		27D51401705F8030A2DF570A /* AppleMusicClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppleMusicClient.swift; path = MusicSync/Services/AppleMusicClient.swift; sourceTree = "<group>"; };
 		3FE5FDAE85BDBD9D105E6D78 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
@@ -78,6 +80,7 @@
 				EDAE2D55D34338DB039E89B1 /* HistoryView.swift */,
 				118FA7951A209BD0A7C744EC /* RootView.swift */,
 				09582690A11AB339F9276193 /* SourceEditView.swift */,
+				AA11BB22CC33DD44EE55FF02 /* PlaylistPickerView.swift */,
 				BB02B8EC8AD5AE7ACF6B4294 /* SourceListView.swift */,
 				DD393C48D2EF44E015C7FA9C /* Assets.xcassets */,
 				75892293C9C504C2C47FF841 /* Info.plist */,
@@ -181,6 +184,7 @@
 				2AF5A22638C30AA6B21065B1 /* HistoryView.swift in Sources */,
 				EF560D2027DA73F4333598E3 /* RootView.swift in Sources */,
 				CD100FC3F0445BEE79E6D037 /* SourceEditView.swift in Sources */,
+				AA11BB22CC33DD44EE55FF01 /* PlaylistPickerView.swift in Sources */,
 				F2B8373674AE9329220B27E1 /* SourceListView.swift in Sources */,
 				F16F8197B6E52CA10E5C51E5 /* SourceStore.swift in Sources */,
 				CEF439381493C5AF4407CD36 /* SyncService.swift in Sources */,

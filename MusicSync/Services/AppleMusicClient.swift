@@ -190,16 +190,29 @@ struct AppleMusicClient: Sendable {
     // MARK: Library playlists
 
     func libraryPlaylists() async throws -> [(id: String, name: String)] {
-        var out: [(String, String)] = []
+        try await libraryPlaylistsDetailed().map { ($0.id, $0.name) }
+    }
+
+    /// Todas las playlists de la biblioteca, con metadatos suficientes para
+    /// mostrarlas en un selector de destino.
+    func libraryPlaylistsDetailed() async throws -> [LibraryPlaylist] {
+        var out: [LibraryPlaylist] = []
         var path: String? = "/v1/me/library/playlists"
         var query: [URLQueryItem]? = [URLQueryItem(name: "limit", value: "100")]
         while let p = path {
-            let page = try await getJSON(DataArray<NamedAttrs>.self, path: p, query: query)
+            let page = try await getJSON(DataArray<PlaylistAttrs>.self, path: p, query: query)
             query = nil
-            out.append(contentsOf: page.data.map { ($0.id, $0.attributes?.name ?? "") })
+            out.append(contentsOf: page.data.map {
+                LibraryPlaylist(id: $0.id,
+                                name: $0.attributes?.name ?? "",
+                                trackCount: nil,
+                                canEdit: $0.attributes?.canEdit ?? true)
+            })
             path = page.next
         }
-        return out
+        return out.sorted {
+            $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
     }
 
     /// Normaliza para comparar nombres: sin mayúsculas, sin acentos y con
@@ -314,6 +327,10 @@ private struct Resource<A: Decodable>: Decodable {
 private struct StorefrontAttrs: Decodable {}
 private struct EmptyAttrs: Decodable {}
 private struct NamedAttrs: Decodable { let name: String? }
+private struct PlaylistAttrs: Decodable {
+    let name: String?
+    let canEdit: Bool?
+}
 
 private struct SongAttrs: Decodable {
     let name: String?

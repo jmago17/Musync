@@ -16,6 +16,11 @@ final class AppStore {
     var progress: [UUID: SyncProgress] = [:]
     var isSyncingAll = false
 
+    /// Playlists existentes en la biblioteca, para elegir destino.
+    var libraryPlaylists: [LibraryPlaylist] = []
+    var isLoadingLibrary = false
+    var libraryError: String?
+
     var isAuthorized: Bool { authStatus == .authorized }
 
     private let syncer = Syncer()
@@ -92,6 +97,40 @@ final class AppStore {
     /// Fetch the source title without syncing — used by the add sheet.
     func peekTitle(url: String) async -> String? {
         try? await client.fetchSourcePlaylist(url: url).title
+    }
+
+    // MARK: Library playlists (destino)
+
+    /// Carga las playlists de la biblioteca para el selector de destino.
+    /// `force` ignora la caché en memoria (pull-to-refresh).
+    func loadLibraryPlaylists(force: Bool = false) async {
+        guard isAuthorized else { return }
+        if !force && !libraryPlaylists.isEmpty { return }
+        guard !isLoadingLibrary else { return }
+        isLoadingLibrary = true
+        libraryError = nil
+        do {
+            libraryPlaylists = try await client.libraryPlaylistsDetailed()
+        } catch {
+            libraryError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+        isLoadingLibrary = false
+    }
+
+    /// Crea una playlist vacía en la biblioteca y la deja seleccionable al vuelo.
+    func createLibraryPlaylist(named name: String) async -> LibraryPlaylist? {
+        do {
+            let id = try await client.createPlaylist(name: name,
+                                                     description: "Creada desde MusicSync",
+                                                     songIDs: [])
+            let pl = LibraryPlaylist(id: id, name: name, trackCount: 0)
+            libraryPlaylists.append(pl)
+            libraryPlaylists.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            return pl
+        } catch {
+            libraryError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            return nil
+        }
     }
 
     // MARK: Syncing
