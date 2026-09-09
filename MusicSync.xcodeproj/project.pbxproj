@@ -32,7 +32,6 @@
 		27D51401705F8030A2DF570A /* AppleMusicClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppleMusicClient.swift; path = MusicSync/Services/AppleMusicClient.swift; sourceTree = "<group>"; };
 		3FE5FDAE85BDBD9D105E6D78 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		68E8DBD124DB652BE1509AA4 /* SourceStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SourceStore.swift; path = MusicSync/Services/SourceStore.swift; sourceTree = "<group>"; };
-		11223344AABBCCDD00000001 /* MusicSync.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; name = MusicSync.entitlements; path = MusicSync/MusicSync.entitlements; sourceTree = "<group>"; };
 		75892293C9C504C2C47FF841 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = MusicSync/Info.plist; sourceTree = "<group>"; };
 		891D849B73F00EDBD2EB863B /* SyncIntents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SyncIntents.swift; path = MusicSync/Intents/SyncIntents.swift; sourceTree = "<group>"; };
 		8F0F11A1B9737F117DEB846A /* MusicSync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusicSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -87,7 +86,6 @@
 				AA11BB22CC33DD44EE55FF04 /* CreatedPlaylists.swift */,
 				BB02B8EC8AD5AE7ACF6B4294 /* SourceListView.swift */,
 				DD393C48D2EF44E015C7FA9C /* Assets.xcassets */,
-				11223344AABBCCDD00000001 /* MusicSync.entitlements */,
 				75892293C9C504C2C47FF841 /* Info.plist */,
 				68E8DBD124DB652BE1509AA4 /* SourceStore.swift */,
 				C891F0F744EC2C06C9F3A39C /* SyncService.swift */,
@@ -207,7 +205,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_ENTITLEMENTS = MusicSync/MusicSync.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = ES2766ARHJ;
@@ -353,7 +350,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_ENTITLEMENTS = MusicSync/MusicSync.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = ES2766ARHJ;
