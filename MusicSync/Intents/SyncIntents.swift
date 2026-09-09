@@ -6,7 +6,7 @@ import MusicKit
 struct SyncAllPlaylistsIntent: AppIntent {
     static var title: LocalizedStringResource = "Sincronizar todas las playlists"
     static var description = IntentDescription(
-        "Espeja todas las playlists configuradas en tu biblioteca de Apple Music.")
+        "Espeja todas las playlists configuradas en tu biblioteca de música.")
 
     /// Abre la app al ejecutarse: foreground = sin límite de tiempo de background y
     /// MusicKit funciona con fiabilidad (en background daba timeout / fallaba).
@@ -55,7 +55,7 @@ struct PlaylistQuery: EntityQuery {
 struct SyncPlaylistIntent: AppIntent {
     static var title: LocalizedStringResource = "Sincronizar una playlist"
     static var description = IntentDescription(
-        "Espeja una playlist concreta en tu biblioteca de Apple Music.")
+        "Espeja una playlist concreta en tu biblioteca de música.")
     static var openAppWhenRun: Bool = true
 
     @Parameter(title: "Playlist")

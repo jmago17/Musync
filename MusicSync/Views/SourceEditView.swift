@@ -7,10 +7,23 @@ struct SourceEditView: View {
     @State private var draft: SavedSource
     @State private var lastRun: SyncRun?
     @State private var showPicker = false
+    @State private var adopting = false
 
     init(source: SavedSource) { _draft = State(initialValue: source) }
 
     private var progress: SyncProgress? { store.progress[draft.id] }
+
+    /// Texto de ayuda del modo, ajustado a lo que de verdad va a pasar.
+    private var modeHelp: String {
+        switch draft.mode {
+        case .replace:
+            return canReplace
+                ? "Deja la playlist exactamente igual que el origen (añade y quita)."
+                : "Añade lo que falte y te lista las canciones sobrantes (no las puede quitar)."
+        case .append:
+            return "Añade solo las canciones nuevas, sin tocar las que ya están."
+        }
+    }
 
     /// ¿Puede MusicSync reemplazar el contenido del destino elegido?
     /// Si aún no hay destino (se creará en el primer sync) sí podrá, porque la
@@ -49,15 +62,32 @@ struct SourceEditView: View {
                     ForEach(SyncMode.allCases) { Text($0.label).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                .disabled(!canReplace)
                 .onChange(of: draft.mode) { store.updateSource(draft) }
-                Text(draft.mode.help).font(.caption).foregroundStyle(.secondary)
+                Text(modeHelp).font(.caption).foregroundStyle(.secondary)
 
-                if !canReplace, draft.lastPlaylistID != nil {
-                    Label("Esta playlist la creaste tú (o la app Música), así que Apple no permite reemplazar su contenido desde otra app. Solo se pueden añadir canciones nuevas.",
+                if !canReplace, draft.mode == .replace {
+                    Label("Este destino no lo creó MusicSync, así que Apple no deja quitarle canciones — solo añadirlas. El sync añadirá lo que falte y te listará las sobrantes para que las borres tú desde Música. Si prefieres espejo automático total, usa «Convertir en gestionada».",
                           systemImage: "info.circle")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    Button {
+                        adopting = true
+                        Task {
+                            if await store.adoptTarget(for: draft.id) != nil,
+                               let updated = store.binding(for: draft.id) {
+                                draft = updated
+                            }
+                            adopting = false
+                        }
+                    } label: {
+                        if adopting {
+                            HStack { ProgressView().controlSize(.small); Text("Creando copia gestionada…") }
+                        } else {
+                            Label("Convertir en gestionada", systemImage: "wand.and.stars")
+                        }
+                    }
+                    .disabled(adopting || draft.lastPlaylistID == nil)
                 }
             }
 
@@ -114,6 +144,15 @@ struct SourceEditView: View {
                                 RunDetailView(run: run)
                             }
                         }
+                        if let surplus = run.surplus, !surplus.isEmpty {
+                            NavigationLink {
+                                RunDetailView(run: run)
+                            } label: {
+                                Label("\(surplus.count) sobrantes por quitar a mano",
+                                      systemImage: "minus.circle")
+                                    .foregroundStyle(.orange)
+                            }
+                        }
                     }
                 }
             }
@@ -128,9 +167,6 @@ struct SourceEditView: View {
         }
         .onChange(of: draft.lastPlaylistID) {
             draft.lastPlaylistName = draft.targetName
-            // Si el destino no admite reemplazo, cae a "Añadir" en vez de fallar
-            // en mitad del sync.
-            if !canReplace { draft.mode = .append }
             store.updateSource(draft)
         }
         .task { await store.loadLibraryPlaylists() }

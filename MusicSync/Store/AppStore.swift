@@ -117,6 +117,35 @@ final class AppStore {
         isLoadingLibrary = false
     }
 
+    /// "Adopta" el destino de una fuente: crea una playlist NUEVA gestionada por
+    /// MusicSync con el contenido actual del destino, y apunta la fuente a ella.
+    /// La playlist original NO se toca (borrarla queda en manos del usuario).
+    /// A partir de ahí el modo Reemplazar funciona al 100%.
+    func adoptTarget(for sourceID: UUID) async -> String? {
+        guard var s = sources.first(where: { $0.id == sourceID }) else { return nil }
+        do {
+            var songIDs: [String] = []
+            if let existing = s.lastPlaylistID {
+                songIDs = try await client.existingTracks(playlistID: existing).map(\.catalogID)
+            }
+            let name = s.targetName.isEmpty ? "Playlist" : s.targetName
+            let newID = try await client.createPlaylist(
+                name: name + " · Sync",
+                description: "Gestionada por MusicSync (adoptada de «\(name)»)",
+                songIDs: songIDs)
+            s.lastPlaylistID = newID
+            s.targetName = name + " · Sync"
+            s.lastPlaylistName = s.targetName
+            s.managed = true
+            updateSource(s)
+            await loadLibraryPlaylists(force: true)
+            return newID
+        } catch {
+            libraryError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            return nil
+        }
+    }
+
     /// Crea una playlist vacía en la biblioteca. **No** se usa desde el selector
     /// (allí la creación se difiere al primer sync para no dejar playlists
     /// vacías); se mantiene por si hace falta creación explícita.

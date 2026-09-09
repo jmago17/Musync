@@ -316,7 +316,14 @@ struct AppleMusicClient: Sendable {
 
     /// Catalog ids already present in a library playlist, for dedupe on append.
     func existingCatalogIDs(playlistID: String) async throws -> Set<String> {
-        var ids = Set<String>()
+        Set(try await existingTracks(playlistID: playlistID).map(\.catalogID))
+    }
+
+    /// Pistas de una playlist de biblioteca con su id de catálogo y metadatos.
+    /// Sirve para dedupe y para calcular sobrantes (canciones que ya no están
+    /// en el origen) de forma legible para el usuario.
+    func existingTracks(playlistID: String) async throws -> [(catalogID: String, title: String, artist: String)] {
+        var out: [(String, String, String)] = []
         var path: String? = "/v1/me/library/playlists/\(playlistID)/tracks"
         var query: [URLQueryItem]? = [
             URLQueryItem(name: "limit", value: "100"),
@@ -327,14 +334,15 @@ struct AppleMusicClient: Sendable {
                 let page = try await getJSON(LibraryTracksPage.self, path: p, query: query)
                 query = nil
                 for t in page.data {
-                    for c in t.relationships?.catalog?.data ?? [] { ids.insert(c.id) }
+                    guard let c = t.relationships?.catalog?.data.first else { continue }
+                    out.append((c.id, t.attributes?.name ?? "", t.attributes?.artistName ?? ""))
                 }
                 path = page.next
             } catch ClientError.http(let code, _) where code == 404 {
-                return ids
+                return out
             }
         }
-        return ids
+        return out
     }
 }
 
@@ -388,7 +396,14 @@ private struct SearchResponse: Decodable {
 private struct LibraryTracksPage: Decodable {
     let data: [Item]
     let next: String?
-    struct Item: Decodable { let relationships: Rel? }
+    struct Item: Decodable {
+        let attributes: Attrs?
+        let relationships: Rel?
+    }
+    struct Attrs: Decodable {
+        let name: String?
+        let artistName: String?
+    }
     struct Rel: Decodable { let catalog: CatalogRel? }
     struct CatalogRel: Decodable { let data: [IDOnly] }
     struct IDOnly: Decodable { let id: String }

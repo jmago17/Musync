@@ -17,7 +17,7 @@ enum SyncMode: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var help: String {
         switch self {
-        case .replace: return "Borra la playlist destino y la recrea con el contenido actual del origen."
+        case .replace: return "Deja el destino igual que el origen. Si el destino no lo creó MusicSync, añade lo que falte y lista las sobrantes."
         case .append:  return "Añade solo las canciones nuevas, sin tocar las que ya están."
         }
     }
@@ -40,6 +40,11 @@ struct SavedSource: Identifiable, Codable, Hashable, Sendable {
     var lastSyncedAt: Date? = nil
     var lastMatched: Int? = nil
     var lastMissed: Int? = nil
+    /// "Gestionada": el destino debe ser una playlist creada por MusicSync.
+    /// Al resolver por nombre se IGNORAN playlists no creadas por la app, de modo
+    /// que el siguiente sync crea la copia gestionada aunque exista otra con el
+    /// mismo nombre. (Optional para decodificar historial antiguo sin la clave.)
+    var managed: Bool? = nil
 }
 
 // MARK: - Source parsing results
@@ -106,4 +111,15 @@ struct SyncRun: Identifiable, Codable, Hashable, Sendable {
     var misses: [MissTrack]
     var failed: Bool = false
     var errorMessage: String? = nil
+    /// Canciones que están en la playlist destino pero YA NO en el origen.
+    /// Solo informativo (modo Añadir): la API no permite quitarlas, pero así el
+    /// usuario sabe exactamente cuáles borrar a mano desde la app Música.
+    var surplus: [SurplusTrack]? = nil
+}
+
+/// Una canción presente en el destino que el origen ya no contiene.
+struct SurplusTrack: Codable, Hashable, Identifiable, Sendable {
+    var id: UUID = UUID()
+    var title: String
+    var artist: String
 }

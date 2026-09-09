@@ -1,0 +1,9 @@
+{
+  "id" : "e3e3754b-ed48-4099-b6da-4a680c8f9dab",
+  "targets" : [
+    {
+      "id" : "4fcf743f-0b58-4355-bb18-0bded4cc52e7",
+      "name" : "MusicSync"
+    }
+  ]
+}

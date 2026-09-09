@@ -16,9 +16,9 @@
 		77CEFE8CBDAB91FD5483A6EB /* Syncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5E25F59ABD0685ACEC270B7 /* Syncer.swift */; };
 		7988744D62D4ED15D06EF470 /* MusicSyncApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D728FEFF364DC1E40CDF4133 /* MusicSyncApp.swift */; };
 		A9FB3BD3F8A0C77B40C42C07 /* AppleMusicClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27D51401705F8030A2DF570A /* AppleMusicClient.swift */; };
-		CD100FC3F0445BEE79E6D037 /* SourceEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09582690A11AB339F9276193 /* SourceEditView.swift */; };
 		AA11BB22CC33DD44EE55FF01 /* PlaylistPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF02 /* PlaylistPickerView.swift */; };
 		AA11BB22CC33DD44EE55FF03 /* CreatedPlaylists.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF04 /* CreatedPlaylists.swift */; };
+		CD100FC3F0445BEE79E6D037 /* SourceEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09582690A11AB339F9276193 /* SourceEditView.swift */; };
 		CEF439381493C5AF4407CD36 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C891F0F744EC2C06C9F3A39C /* SyncService.swift */; };
 		EF560D2027DA73F4333598E3 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 118FA7951A209BD0A7C744EC /* RootView.swift */; };
 		F16F8197B6E52CA10E5C51E5 /* SourceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68E8DBD124DB652BE1509AA4 /* SourceStore.swift */; };
@@ -28,15 +28,16 @@
 
 /* Begin PBXFileReference section */
 		09582690A11AB339F9276193 /* SourceEditView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SourceEditView.swift; path = MusicSync/Views/SourceEditView.swift; sourceTree = "<group>"; };
-		AA11BB22CC33DD44EE55FF02 /* PlaylistPickerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PlaylistPickerView.swift; path = MusicSync/Views/PlaylistPickerView.swift; sourceTree = "<group>"; };
-		AA11BB22CC33DD44EE55FF04 /* CreatedPlaylists.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CreatedPlaylists.swift; path = MusicSync/Services/CreatedPlaylists.swift; sourceTree = "<group>"; };
 		118FA7951A209BD0A7C744EC /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RootView.swift; path = MusicSync/Views/RootView.swift; sourceTree = "<group>"; };
 		27D51401705F8030A2DF570A /* AppleMusicClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppleMusicClient.swift; path = MusicSync/Services/AppleMusicClient.swift; sourceTree = "<group>"; };
 		3FE5FDAE85BDBD9D105E6D78 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		68E8DBD124DB652BE1509AA4 /* SourceStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SourceStore.swift; path = MusicSync/Services/SourceStore.swift; sourceTree = "<group>"; };
+		11223344AABBCCDD00000001 /* MusicSync.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; name = MusicSync.entitlements; path = MusicSync/MusicSync.entitlements; sourceTree = "<group>"; };
 		75892293C9C504C2C47FF841 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = MusicSync/Info.plist; sourceTree = "<group>"; };
 		891D849B73F00EDBD2EB863B /* SyncIntents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SyncIntents.swift; path = MusicSync/Intents/SyncIntents.swift; sourceTree = "<group>"; };
 		8F0F11A1B9737F117DEB846A /* MusicSync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusicSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA11BB22CC33DD44EE55FF02 /* PlaylistPickerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PlaylistPickerView.swift; path = MusicSync/Views/PlaylistPickerView.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE55FF04 /* CreatedPlaylists.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CreatedPlaylists.swift; path = MusicSync/Services/CreatedPlaylists.swift; sourceTree = "<group>"; };
 		BB02B8EC8AD5AE7ACF6B4294 /* SourceListView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SourceListView.swift; path = MusicSync/Views/SourceListView.swift; sourceTree = "<group>"; };
 		C891F0F744EC2C06C9F3A39C /* SyncService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SyncService.swift; path = MusicSync/Services/SyncService.swift; sourceTree = "<group>"; };
 		D728FEFF364DC1E40CDF4133 /* MusicSyncApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MusicSyncApp.swift; path = MusicSync/MusicSyncApp.swift; sourceTree = "<group>"; };
@@ -86,6 +87,7 @@
 				AA11BB22CC33DD44EE55FF04 /* CreatedPlaylists.swift */,
 				BB02B8EC8AD5AE7ACF6B4294 /* SourceListView.swift */,
 				DD393C48D2EF44E015C7FA9C /* Assets.xcassets */,
+				11223344AABBCCDD00000001 /* MusicSync.entitlements */,
 				75892293C9C504C2C47FF841 /* Info.plist */,
 				68E8DBD124DB652BE1509AA4 /* SourceStore.swift */,
 				C891F0F744EC2C06C9F3A39C /* SyncService.swift */,
@@ -205,12 +207,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = MusicSync/MusicSync.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = ES2766ARHJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MusicSync/Info.plist;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "MusicSync sincroniza playlists públicas en tu biblioteca de Apple Music.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -218,7 +222,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jmago17.MusicSync;
+				PRODUCT_BUNDLE_IDENTIFIER = smargon.com.Musync;
 				PRODUCT_NAME = MusicSync;
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -349,12 +353,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = MusicSync/MusicSync.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = ES2766ARHJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MusicSync/Info.plist;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "MusicSync sincroniza playlists públicas en tu biblioteca de Apple Music.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -362,7 +368,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jmago17.MusicSync;
+				PRODUCT_BUNDLE_IDENTIFIER = smargon.com.Musync;
 				PRODUCT_NAME = MusicSync;
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;

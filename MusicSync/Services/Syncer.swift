@@ -64,18 +64,19 @@ struct Syncer: Sendable {
 
             let description = "Mirror de \(source.sourceURL) · MusicSync"
             let existing = try await resolveExistingID(source, targetName: targetName)
-            let playlistID = try await write(mode: source.mode,
-                                             existing: existing,
-                                             targetName: targetName,
-                                             description: description,
-                                             songIDs: songIDs)
+            let result = try await write(mode: source.mode,
+                                         existing: existing,
+                                         targetName: targetName,
+                                         description: description,
+                                         songIDs: songIDs)
 
             p.phase = .done
             progress(p)
 
             return SyncRun(date: Date(), sourceName: targetName, sourceURL: source.sourceURL,
                            targetName: targetName, mode: source.mode, matched: songIDs.count,
-                           totalTracks: total, playlistID: playlistID, misses: misses)
+                           totalTracks: total, playlistID: result.playlistID, misses: misses,
+                           surplus: result.surplus.isEmpty ? nil : result.surplus)
         } catch {
             let msg = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             return SyncRun(date: Date(), sourceName: source.targetName, sourceURL: source.sourceURL,
@@ -108,34 +109,50 @@ struct Syncer: Sendable {
                        existing: String?,
                        targetName: String,
                        description: String,
-                       songIDs: [String]) async throws -> String {
+                       songIDs: [String]) async throws -> (playlistID: String, surplus: [SurplusTrack]) {
         // Sin destino conocido: crear es la única opción legítima.
         guard let existing else {
-            return try await client.createPlaylist(name: targetName,
-                                                   description: description,
-                                                   songIDs: songIDs)
+            let id = try await client.createPlaylist(name: targetName,
+                                                     description: description,
+                                                     songIDs: songIDs)
+            return (id, [])
         }
 
         switch mode {
         case .replace:
-            // Reemplazar SOLO es posible en playlists creadas por esta app
-            // (limitación de `MusicLibrary.edit`). Si no se puede, se informa
-            // del error — NUNCA se borra ni se crea un duplicado.
-            try await client.editOwnPlaylist(id: existing,
-                                             name: targetName,
-                                             description: description,
-                                             songIDs: songIDs)
-            return existing
+            if CreatedPlaylists.contains(existing) {
+                // Playlist gestionada por MusicSync → reemplazo real vía MusicKit.
+                try await client.editOwnPlaylist(id: existing,
+                                                 name: targetName,
+                                                 description: description,
+                                                 songIDs: songIDs)
+                return (existing, [])
+            }
+            // Playlist NO creada por la app: Apple no permite reemplazar su
+            // contenido. Hacemos lo máximo posible sin destruir nada:
+            //   1. añadir lo que falte (dedupe),
+            //   2. reportar las canciones sobrantes para limpieza manual.
+            let surplus = try await appendAndDiff(existing, songIDs: songIDs)
+            return (existing, surplus)
 
         case .append:
-            return try await appendDedupe(existing, songIDs: songIDs)
+            let surplus = try await appendAndDiff(existing, songIDs: songIDs)
+            return (existing, surplus)
         }
     }
 
-    private func appendDedupe(_ playlistID: String, songIDs: [String]) async throws -> String {
-        let already = try await client.existingCatalogIDs(playlistID: playlistID)
+    /// Añade lo que falta (con dedupe) y devuelve las canciones del destino que
+    /// ya no están en el origen — la parte del "reemplazo" que la API no permite
+    /// hacer y que el usuario puede completar a mano.
+    private func appendAndDiff(_ playlistID: String, songIDs: [String]) async throws -> [SurplusTrack] {
+        let existing = try await client.existingTracks(playlistID: playlistID)
+        let already = Set(existing.map(\.catalogID))
         let fresh = songIDs.filter { !already.contains($0) }
         if !fresh.isEmpty { try await client.addTracks(playlistID: playlistID, songIDs: fresh) }
-        return playlistID
+
+        let wanted = Set(songIDs)
+        return existing
+            .filter { !wanted.contains($0.catalogID) }
+            .map { SurplusTrack(title: $0.title, artist: $0.artist) }
     }
 }

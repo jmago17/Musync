@@ -79,6 +79,21 @@ struct RunDetailView: View {
                     }
                 }
             }
+
+            if let surplus = current.surplus, !surplus.isEmpty {
+                Section {
+                    ForEach(surplus) { track in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(track.title).lineLimit(1)
+                            Text(track.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                    }
+                } header: {
+                    Text("Sobrantes (\(surplus.count))")
+                } footer: {
+                    Text("Estas canciones están en la playlist pero ya no en el origen. Apple no permite que otra app las quite: bórralas desde la app Música, o convierte el destino en playlist gestionada para que sea automático.")
+                }
+            }
         }
         .navigationTitle("Detalle")
         .navigationBarTitleDisplayMode(.inline)
