@@ -110,9 +110,16 @@ final class AppStore {
         isLoadingLibrary = true
         libraryError = nil
         do {
+            let subscription = try await MusicSubscription.current
+            guard subscription.hasCloudLibraryEnabled else {
+                libraryError = "La biblioteca musical en la nube está desactivada. Activa Sincronizar biblioteca en Ajustes → Apps → Música."
+                isLoadingLibrary = false
+                return
+            }
             libraryPlaylists = try await client.libraryPlaylistsDetailed()
         } catch {
-            libraryError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            libraryError = "No se pudo leer la biblioteca (\(String(describing: type(of: error)))): \(message)"
         }
         isLoadingLibrary = false
     }

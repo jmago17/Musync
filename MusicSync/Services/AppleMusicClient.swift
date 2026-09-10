@@ -203,28 +203,26 @@ struct AppleMusicClient: Sendable {
     /// si `MusicLibrary.edit` puede reemplazar su contenido (solo playlists
     /// creadas por esta app).
     func libraryPlaylistsDetailed() async throws -> [LibraryPlaylist] {
-        var out: [LibraryPlaylist] = []
-        var path: String? = "/v1/me/library/playlists"
-        var query: [URLQueryItem]? = [URLQueryItem(name: "limit", value: "100")]
-        while let p = path {
-            let page = try await getJSON(DataArray<PlaylistAttrs>.self, path: p, query: query)
-            query = nil
-            out.append(contentsOf: page.data.map {
-                LibraryPlaylist(id: $0.id,
-                                name: $0.attributes?.name ?? "",
-                                trackCount: nil,
-                                canEdit: $0.attributes?.canEdit ?? true)
-            })
-            path = page.next
+        // Use MusicKit's native library API. Unlike a hand-built `/v1/me/...`
+        // MusicDataRequest, this is the documented path for the library granted
+        // by MusicAuthorization and gives us a meaningful framework error.
+        var request = MusicLibraryRequest<Playlist>()
+        request.limit = 100
+        var batch = try await request.response().items
+        var playlists = Array(batch)
+        while batch.hasNextBatch, let next = try await batch.nextBatch(limit: 100) {
+            playlists.append(contentsOf: next)
+            batch = next
         }
 
-        // Marca cuáles puede reemplazar MusicSync (las que ha creado la app).
         let owned = CreatedPlaylists.ids
-        for i in out.indices {
-            out[i].isReplaceable = owned.contains(out[i].id)
-        }
-
-        return out.sorted {
+        return playlists.map {
+            LibraryPlaylist(id: $0.id.rawValue,
+                            name: $0.name,
+                            trackCount: $0.tracks?.count,
+                            canEdit: true,
+                            isReplaceable: owned.contains($0.id.rawValue))
+        }.sorted {
             $0.name.localizedStandardCompare($1.name) == .orderedAscending
         }
     }

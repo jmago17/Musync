@@ -49,16 +49,18 @@ struct PlaylistPickerView: View {
                 }
 
                 Section("En tu biblioteca") {
+                    if let err = store.libraryError {
+                        Label(err, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.red)
+                            .font(.callout)
+                            .textSelection(.enabled)
+                    }
                     if store.isLoadingLibrary && store.libraryPlaylists.isEmpty {
                         HStack {
                             ProgressView().controlSize(.small)
                             Text("Leyendo tu biblioteca…").foregroundStyle(.secondary)
                         }
-                    } else if let err = store.libraryError, store.libraryPlaylists.isEmpty {
-                        Label(err, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.red)
-                            .font(.callout)
-                    } else if filtered.isEmpty {
+                    } else if filtered.isEmpty && store.libraryError == nil {
                         Text(search.isEmpty ? "No tienes playlists todavía."
                                             : "Ninguna coincide con «\(search)».")
                             .foregroundStyle(.secondary)
