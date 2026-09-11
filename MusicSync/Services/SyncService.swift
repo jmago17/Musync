@@ -11,6 +11,33 @@ struct SyncService: Sendable {
         var playlists: Int = 0
     }
 
+    static func prepareOne(id: String) async throws -> PreparedSync? {
+        guard let source = SourceStore.loadSources().first(where: { $0.id.uuidString == id }) else {
+            return nil
+        }
+        let prepared = try await Syncer().prepare(source: source) { _ in }
+        SourceStore.savePrepared(prepared)
+        return prepared
+    }
+
+    static func applyPrepared(id: UUID) async throws -> SyncRun? {
+        guard let prepared = SourceStore.prepared(id: id) else { return nil }
+        var sources = SourceStore.loadSources()
+        guard let idx = sources.firstIndex(where: { $0.id == prepared.sourceID }) else { return nil }
+        let run = try await Syncer().apply(prepared: prepared, source: sources[idx]) { _ in }
+        var history = SourceStore.loadHistory()
+        history.insert(run, at: 0)
+        sources[idx].lastPlaylistID = run.playlistID
+        sources[idx].lastPlaylistName = run.targetName
+        sources[idx].lastSyncedAt = run.date
+        sources[idx].lastMatched = run.matched
+        sources[idx].lastMissed = run.misses.count
+        SourceStore.saveSources(sources)
+        SourceStore.saveHistory(history)
+        SourceStore.removePrepared(id: id)
+        return run
+    }
+
     /// Sync a single configured source by id. Returns nil if not found.
     static func syncOne(id: String) async -> SyncRun? {
         var sources = SourceStore.loadSources()

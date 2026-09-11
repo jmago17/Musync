@@ -79,8 +79,122 @@ struct SyncPlaylistIntent: AppIntent {
     }
 }
 
+// MARK: - Two-step sync for Shortcuts time limits
+
+/// A persisted batch of catalog song IDs returned by "Obtener canciones" and
+/// accepted directly by "Añadir/reemplazar canciones" in the next Shortcut step.
+struct PreparedSongsEntity: AppEntity, Identifiable {
+    var id: String
+    var name: String
+    var songCount: Int
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Canciones preparadas"
+    var displayRepresentation: DisplayRepresentation {
+        DisplayRepresentation(title: "\(name)", subtitle: "\(songCount) canciones")
+    }
+    static var defaultQuery = PreparedSongsQuery()
+}
+
+struct PreparedSongsQuery: EntityQuery {
+    func entities(for identifiers: [String]) async throws -> [PreparedSongsEntity] {
+        let wanted = Set(identifiers)
+        return SourceStore.loadPrepared().compactMap { item in
+            guard wanted.contains(item.id.uuidString) else { return nil }
+            return PreparedSongsEntity(id: item.id.uuidString, name: item.targetName,
+                                       songCount: item.songIDs.count)
+        }
+    }
+
+    func suggestedEntities() async throws -> [PreparedSongsEntity] {
+        SourceStore.loadPrepared().map {
+            PreparedSongsEntity(id: $0.id.uuidString, name: $0.targetName,
+                                songCount: $0.songIDs.count)
+        }
+    }
+}
+
+struct GetPlaylistSongsIntent: AppIntent {
+    static var title: LocalizedStringResource = "Obtener canciones de playlist"
+    static var description = IntentDescription(
+        "Lee la playlist origen y prepara sus canciones para una acción posterior.")
+    static var openAppWhenRun: Bool = true
+
+    @Parameter(title: "Playlist")
+    var playlist: PlaylistEntity
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Obtener canciones de \(\.$playlist)")
+    }
+
+    func perform() async throws -> some IntentResult & ReturnsValue<PreparedSongsEntity> & ProvidesDialog {
+        guard MusicAuthorization.currentStatus == .authorized else {
+            throw MusicSyncIntentError.notAuthorized
+        }
+        guard let prepared = try await SyncService.prepareOne(id: playlist.id) else {
+            throw MusicSyncIntentError.playlistNotFound
+        }
+        let value = PreparedSongsEntity(id: prepared.id.uuidString,
+                                        name: prepared.targetName,
+                                        songCount: prepared.songIDs.count)
+        return .result(value: value,
+                       dialog: "\(prepared.songIDs.count) de \(prepared.totalTracks) canciones preparadas.")
+    }
+}
+
+struct ApplyPlaylistSongsIntent: AppIntent {
+    static var title: LocalizedStringResource = "Añadir o reemplazar canciones"
+    static var description = IntentDescription(
+        "Añade o reemplaza en la playlist destino un lote preparado previamente.")
+    static var openAppWhenRun: Bool = true
+
+    @Parameter(title: "Canciones preparadas")
+    var preparedSongs: PreparedSongsEntity
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Añadir o reemplazar \(\.$preparedSongs)")
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard MusicAuthorization.currentStatus == .authorized else {
+            throw MusicSyncIntentError.notAuthorized
+        }
+        guard let id = UUID(uuidString: preparedSongs.id),
+              let run = try await SyncService.applyPrepared(id: id) else {
+            throw MusicSyncIntentError.preparedBatchNotFound
+        }
+        return .result(dialog: "\(run.targetName): \(run.matched)/\(run.totalTracks) canciones escritas.")
+    }
+}
+
+enum MusicSyncIntentError: LocalizedError {
+    case notAuthorized
+    case playlistNotFound
+    case preparedBatchNotFound
+
+    var errorDescription: String? {
+        switch self {
+        case .notAuthorized:
+            return "Abre MusicSync y autoriza el acceso a Música."
+        case .playlistNotFound:
+            return "No encontré esa playlist configurada."
+        case .preparedBatchNotFound:
+            return "El lote preparado no existe o ha caducado. Ejecuta primero Obtener canciones."
+        }
+    }
+}
+
 struct MusicSyncShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: GetPlaylistSongsIntent(),
+            phrases: ["Obtener canciones con \(.applicationName)"],
+            shortTitle: "Obtener canciones",
+            systemImageName: "arrow.down.circle")
+        AppShortcut(
+            intent: ApplyPlaylistSongsIntent(),
+            phrases: ["Escribir canciones con \(.applicationName)"],
+            shortTitle: "Añadir o reemplazar",
+            systemImageName: "arrow.up.circle")
         AppShortcut(
             intent: SyncPlaylistIntent(),
             phrases: [

@@ -85,6 +85,22 @@ struct CatalogSong: Codable, Hashable, Identifiable, Sendable {
     var artworkURL: String?
 }
 
+// MARK: - Prepared shortcut sync (persisted hand-off)
+
+/// Result of the expensive fetch/match phase. Persisted so Shortcuts can end
+/// one App Intent and pass a lightweight identifier to the write intent.
+struct PreparedSync: Identifiable, Codable, Hashable, Sendable {
+    var id: UUID = UUID()
+    var createdAt: Date = Date()
+    var sourceID: UUID
+    var sourceURL: String
+    var targetName: String
+    var mode: SyncMode
+    var songIDs: [String]
+    var totalTracks: Int
+    var misses: [MissTrack]
+}
+
 // MARK: - Sync run history (persisted)
 
 struct MissTrack: Codable, Hashable, Identifiable, Sendable {

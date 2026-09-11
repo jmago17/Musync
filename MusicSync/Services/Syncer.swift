@@ -26,6 +26,57 @@ struct SyncProgress: Sendable, Equatable {
 struct Syncer: Sendable {
     let client = AppleMusicClient()
 
+    /// Expensive half of a sync: fetch the source and match every track.
+    /// The result can cross an App Intent boundary without repeating the work.
+    func prepare(source: SavedSource,
+                 progress: @escaping @Sendable (SyncProgress) -> Void) async throws -> PreparedSync {
+        var p = SyncProgress()
+        progress(p)
+        let storefront = try await client.userStorefront()
+        let src = try await client.fetchSourcePlaylist(url: source.sourceURL)
+        let targetName = source.targetName.isEmpty ? src.title : source.targetName
+        var songIDs: [String] = []
+        var misses: [MissTrack] = []
+        for (i, track) in src.tracks.enumerated() {
+            if let song = try await client.match(track, storefront: storefront) {
+                songIDs.append(song.id)
+            } else {
+                misses.append(MissTrack(title: track.title, artist: track.artist,
+                                        isrc: track.isrc, srcID: track.srcID))
+            }
+            p.phase = .matching(done: i + 1, total: src.tracks.count)
+            p.matched = songIDs.count
+            progress(p)
+        }
+        guard !songIDs.isEmpty else {
+            throw SyncSplitError.noSongsMatched
+        }
+        return PreparedSync(sourceID: source.id, sourceURL: source.sourceURL,
+                            targetName: targetName, mode: source.mode,
+                            songIDs: songIDs, totalTracks: src.tracks.count,
+                            misses: misses)
+    }
+
+    /// Lightweight half: resolve the destination and write a prepared batch.
+    func apply(prepared: PreparedSync, source: SavedSource,
+               progress: @escaping @Sendable (SyncProgress) -> Void) async throws -> SyncRun {
+        var p = SyncProgress(phase: .writing, matched: prepared.songIDs.count)
+        progress(p)
+        let description = "Mirror de \(prepared.sourceURL) · MusicSync"
+        let existing = try await resolveExistingID(source, targetName: prepared.targetName)
+        let result = try await write(mode: prepared.mode, existing: existing,
+                                     targetName: prepared.targetName,
+                                     description: description, songIDs: prepared.songIDs)
+        p.phase = .done
+        progress(p)
+        return SyncRun(date: Date(), sourceName: prepared.targetName,
+                       sourceURL: prepared.sourceURL, targetName: prepared.targetName,
+                       mode: prepared.mode, matched: prepared.songIDs.count,
+                       totalTracks: prepared.totalTracks, playlistID: result.playlistID,
+                       misses: prepared.misses,
+                       surplus: result.surplus.isEmpty ? nil : result.surplus)
+    }
+
     func run(source: SavedSource,
              progress: @escaping @Sendable (SyncProgress) -> Void) async -> SyncRun {
         var p = SyncProgress()
@@ -154,5 +205,13 @@ struct Syncer: Sendable {
         return existing
             .filter { !wanted.contains($0.catalogID) }
             .map { SurplusTrack(title: $0.title, artist: $0.artist) }
+    }
+}
+
+
+enum SyncSplitError: LocalizedError {
+    case noSongsMatched
+    var errorDescription: String? {
+        "Ninguna canción encontrada en tu catálogo."
     }
 }
