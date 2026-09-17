@@ -8,9 +8,8 @@ struct SyncAllPlaylistsIntent: AppIntent {
     static var description = IntentDescription(
         "Espeja todas las playlists configuradas en tu biblioteca de música.")
 
-    /// Abre la app al ejecutarse: foreground = sin límite de tiempo de background y
-    /// MusicKit funciona con fiabilidad (en background daba timeout / fallaba).
-    static var openAppWhenRun: Bool = true
+    /// Debe poder ejecutarse desde una automatización sin abrir MusicSync.
+    static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         guard MusicAuthorization.currentStatus == .authorized else {
@@ -56,7 +55,7 @@ struct SyncPlaylistIntent: AppIntent {
     static var title: LocalizedStringResource = "Sincronizar una playlist"
     static var description = IntentDescription(
         "Espeja una playlist concreta en tu biblioteca de música.")
-    static var openAppWhenRun: Bool = true
+    static var openAppWhenRun: Bool = false
 
     @Parameter(title: "Playlist")
     var playlist: PlaylistEntity
@@ -117,7 +116,7 @@ struct GetPlaylistSongsIntent: AppIntent {
     static var title: LocalizedStringResource = "Obtener canciones de playlist"
     static var description = IntentDescription(
         "Lee la playlist origen y prepara sus canciones para una acción posterior.")
-    static var openAppWhenRun: Bool = true
+    static var openAppWhenRun: Bool = false
 
     @Parameter(title: "Playlist")
     var playlist: PlaylistEntity
@@ -145,7 +144,7 @@ struct ApplyPlaylistSongsIntent: AppIntent {
     static var title: LocalizedStringResource = "Añadir o reemplazar canciones"
     static var description = IntentDescription(
         "Añade o reemplaza en la playlist destino un lote preparado previamente.")
-    static var openAppWhenRun: Bool = true
+    static var openAppWhenRun: Bool = false
 
     @Parameter(title: "Canciones preparadas")
     var preparedSongs: PreparedSongsEntity
