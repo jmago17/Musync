@@ -64,8 +64,19 @@ struct AppleMusicClient: Sendable {
             return response.data
         } catch let error as MusicDataRequest.Error {
             let msg = [error.title, error.detailText].compactMap { $0 }.joined(separator: " — ")
-            throw ClientError.http(error.status, msg.isEmpty ? error.localizedDescription : msg)
+            throw ClientError.http(error.status, "\(method) \(path): \(msg.isEmpty ? error.localizedDescription : msg)")
+        } catch {
+            throw ClientError.decode(Self.diagnostic(error, context: "\(method) \(path)"))
         }
+    }
+
+    private static func diagnostic(_ error: Error, context: String) -> String {
+        let ns = error as NSError
+        var text = "\(context): \(ns.localizedDescription) [\(ns.domain), código \(ns.code)]"
+        if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError {
+            text += " — \(underlying.localizedDescription) [\(underlying.domain), código \(underlying.code)]"
+        }
+        return text
     }
 
     private func getJSON<T: Decodable>(_ type: T.Type,
@@ -86,9 +97,11 @@ struct AppleMusicClient: Sendable {
     // MARK: Storefront
 
     func userStorefront() async throws -> String {
-        let r = try await getJSON(DataArray<StorefrontAttrs>.self, path: "/v1/me/storefront")
-        guard let id = r.data.first?.id else { throw ClientError.decode("storefront vacío") }
-        return id
+        do {
+            return try await MusicDataRequest.currentCountryCode.lowercased()
+        } catch {
+            throw ClientError.decode(Self.diagnostic(error, context: "Región de la cuenta Apple Music"))
+        }
     }
 
     // MARK: Source playlist (any storefront)
