@@ -13,6 +13,12 @@ struct RootView: View {
             }
         }
         .animation(.default, value: store.isAuthorized)
+        .alert("No se pudieron guardar los cambios", isPresented: Binding(
+            get: { store.persistenceError != nil },
+            set: { if !$0 { store.persistenceError = nil } }
+        )) {
+            Button("Aceptar") { store.persistenceError = nil }
+        } message: { Text(store.persistenceError ?? "") }
     }
 }
 

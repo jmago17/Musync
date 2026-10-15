@@ -1,27 +1,11 @@
 import Foundation
 
-/// Registro de las playlists que ha creado MusicSync.
-///
-/// Hace falta porque Apple **no expone** quién creó una playlist: ni la API REST
-/// (`LibraryPlaylists.Attributes` solo trae `canEdit`, que se refiere a poder
-/// añadir pistas) ni MusicKit (`Playlist` no tiene `isEditable`, y `Playlist.Kind`
-/// solo distingue editorial/personalMix/replay/userShared/external).
-///
-/// Sin embargo `MusicLibrary.edit` **solo** funciona sobre playlists creadas por
-/// esta app. Así que guardamos nosotros los ids al crearlas, y ese registro es lo
-/// que determina si el modo "Reemplazar" está disponible para un destino.
+/// Local provenance is migrated with the rest of the state and committed
+/// atomically. Apple still determines whether a playlist is actually editable.
 enum CreatedPlaylists {
-    private static let key = "MusicSync.createdPlaylistIDs"
-
-    static var ids: Set<String> {
-        Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
+    static var ids: Set<String> { get throws { try SourceStore.store.read().createdPlaylistIDs } }
+    static func remember(_ id: String) throws {
+        try SourceStore.store.update { $0.createdPlaylistIDs.insert(id) }
     }
-
-    static func remember(_ id: String) {
-        var current = ids
-        current.insert(id)
-        UserDefaults.standard.set(Array(current), forKey: key)
-    }
-
-    static func contains(_ id: String) -> Bool { ids.contains(id) }
+    static func contains(_ id: String) throws -> Bool { try ids.contains(id) }
 }

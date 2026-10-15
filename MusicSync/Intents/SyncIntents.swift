@@ -15,7 +15,7 @@ struct SyncAllPlaylistsIntent: AppIntent {
         guard MusicAuthorization.currentStatus == .authorized else {
             return .result(dialog: "Abre MusicSync y autoriza Apple Music antes de automatizar.")
         }
-        let s = await SyncService.syncAll()
+        let s = try await SyncService.syncAll()
         let dialog: String
         if s.failed == 0 {
             dialog = "\(s.ok) playlists sincronizadas · \(s.matched) canciones."
@@ -40,12 +40,12 @@ struct PlaylistEntity: AppEntity, Identifiable {
 
 struct PlaylistQuery: EntityQuery {
     func entities(for identifiers: [String]) async throws -> [PlaylistEntity] {
-        SourceStore.loadSources()
+        try SourceStore.loadSources()
             .filter { identifiers.contains($0.id.uuidString) }
             .map { PlaylistEntity(id: $0.id.uuidString, name: $0.targetName) }
     }
     func suggestedEntities() async throws -> [PlaylistEntity] {
-        SourceStore.loadSources().map { PlaylistEntity(id: $0.id.uuidString, name: $0.targetName) }
+        try SourceStore.loadSources().map { PlaylistEntity(id: $0.id.uuidString, name: $0.targetName) }
     }
 }
 
@@ -68,7 +68,7 @@ struct SyncPlaylistIntent: AppIntent {
         guard MusicAuthorization.currentStatus == .authorized else {
             return .result(dialog: "Abre MusicSync y autoriza Apple Music antes de automatizar.")
         }
-        guard let run = await SyncService.syncOne(id: playlist.id) else {
+        guard let run = try await SyncService.syncOne(id: playlist.id) else {
             return .result(dialog: "No encontré esa playlist.")
         }
         let dialog = run.failed
@@ -97,7 +97,7 @@ struct PreparedSongsEntity: AppEntity, Identifiable {
 struct PreparedSongsQuery: EntityQuery {
     func entities(for identifiers: [String]) async throws -> [PreparedSongsEntity] {
         let wanted = Set(identifiers)
-        return SourceStore.loadPrepared().compactMap { item in
+        return try SourceStore.loadPrepared().compactMap { item in
             guard wanted.contains(item.id.uuidString) else { return nil }
             return PreparedSongsEntity(id: item.id.uuidString, name: item.targetName,
                                        songCount: item.songIDs.count)
@@ -105,7 +105,7 @@ struct PreparedSongsQuery: EntityQuery {
     }
 
     func suggestedEntities() async throws -> [PreparedSongsEntity] {
-        SourceStore.loadPrepared().map {
+        try SourceStore.loadPrepared().map {
             PreparedSongsEntity(id: $0.id.uuidString, name: $0.targetName,
                                 songCount: $0.songIDs.count)
         }

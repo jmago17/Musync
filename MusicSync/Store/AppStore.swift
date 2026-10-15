@@ -20,48 +20,32 @@ final class AppStore {
     var libraryPlaylists: [LibraryPlaylist] = []
     var isLoadingLibrary = false
     var libraryError: String?
+    var persistenceError: String?
 
     var isAuthorized: Bool { authStatus == .authorized }
 
-    private let syncer = Syncer()
     private let client = AppleMusicClient()
 
     // MARK: Persistence
 
-    private static var supportDir: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("MusicSync", isDirectory: true)
-        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-        return base
-    }
-    private var sourcesURL: URL { Self.supportDir.appendingPathComponent("sources.json") }
-    private var historyURL: URL { Self.supportDir.appendingPathComponent("history.json") }
-
-    init() {
-        load()
-    }
+    init() { load() }
 
     private func load() {
-        if let data = try? Data(contentsOf: sourcesURL),
-           let decoded = try? JSONDecoder().decode([SavedSource].self, from: data) {
-            sources = decoded
-        } else {
-            sources = SavedSource.defaults
-            persistSources()
-        }
-        if let data = try? Data(contentsOf: historyURL),
-           let decoded = try? JSONDecoder().decode([SyncRun].self, from: data) {
-            history = decoded
-        }
+        do {
+            let state = try SourceStore.store.read()
+            sources = state.sources
+            history = state.history
+        } catch { persistenceError = error.localizedDescription }
     }
 
-    private func persistSources() {
-        try? JSONEncoder().encode(sources).write(to: sourcesURL)
-    }
-    private func persistHistory() {
-        // Keep the last 100 runs.
-        if history.count > 100 { history = Array(history.prefix(100)) }
-        try? JSONEncoder().encode(history).write(to: historyURL)
+    private func mutate(_ change: (inout SyncDiskStore.State) throws -> Void) -> Bool {
+        do {
+            let lease = try SourceStore.beginOperation()
+            defer { withExtendedLifetime(lease) {} }
+            try SourceStore.store.update(change)
+            load()
+            return true
+        } catch { persistenceError = error.localizedDescription; return false }
     }
 
     // MARK: Auth
@@ -72,24 +56,31 @@ final class AppStore {
 
     func refreshAuthStatus() {
         authStatus = AppleMusicClient.authStatus
+        load()
     }
 
     // MARK: Source CRUD
 
-    func addSource(_ s: SavedSource) {
-        sources.append(s)
-        persistSources()
+    @discardableResult
+    func addSource(_ source: SavedSource) -> Bool {
+        mutate { $0.sources.append(source) }
     }
 
-    func updateSource(_ s: SavedSource) {
-        guard let i = sources.firstIndex(where: { $0.id == s.id }) else { return }
-        sources[i] = s
-        persistSources()
+    @discardableResult
+    func updateSource(_ source: SavedSource, expected: SavedSource) -> Bool {
+        let saved = mutate { state in
+            try SyncDiskStore.replaceSource(source, expected: expected, in: &state)
+        }
+        if !saved { load() }
+        return saved
     }
 
     func deleteSources(at offsets: IndexSet) {
-        sources.remove(atOffsets: offsets)
-        persistSources()
+        let ids = Set(offsets.map { sources[$0].id })
+        _ = mutate { state in
+            state.sources.removeAll { ids.contains($0.id) }
+            state.prepared.removeAll { ids.contains($0.sourceID) }
+        }
     }
 
     func binding(for id: UUID) -> SavedSource? { sources.first(where: { $0.id == id }) }
@@ -129,24 +120,40 @@ final class AppStore {
     /// La playlist original NO se toca (borrarla queda en manos del usuario).
     /// A partir de ahí el modo Reemplazar funciona al 100%.
     func adoptTarget(for sourceID: UUID) async -> String? {
-        guard var s = sources.first(where: { $0.id == sourceID }) else { return nil }
         do {
-            var songIDs: [String] = []
-            if let existing = s.lastPlaylistID {
-                songIDs = try await client.existingTracks(playlistID: existing).map(\.catalogID)
+            let lease = try SourceStore.beginOperation()
+            defer { withExtendedLifetime(lease) {} }
+            guard var s = try SourceStore.loadSources().first(where: { $0.id == sourceID }) else { return nil }
+            let key = sourceID.uuidString
+            let pending: SyncDiskStore.PendingAdoption
+            if let saved = try SourceStore.store.read().pendingAdoptions[key] {
+                guard saved.source == s else { throw SyncIntegrityError.stalePreparation }
+                pending = saved
+            } else {
+                guard let existing = s.lastPlaylistID else { return nil }
+                let songIDs = try await client.existingTracks(playlistID: existing).map(\.catalogID)
+                let name = (s.targetName.isEmpty ? "Playlist" : s.targetName) + " · Sync"
+                let id = try await client.createPlaylist(name: name, description: "Gestionada por MusicSync", songIDs: [])
+                pending = SyncDiskStore.PendingAdoption(source: s, playlistID: id, name: name, songIDs: songIDs)
+                try SourceStore.store.update {
+                    $0.pendingAdoptions[key] = pending
+                    $0.completedCreations = $0.completedCreations.filter { $0.value != id }
+                }
             }
-            let name = s.targetName.isEmpty ? "Playlist" : s.targetName
-            let newID = try await client.createPlaylist(
-                name: name + " · Sync",
-                description: "Gestionada por MusicSync (adoptada de «\(name)»)",
-                songIDs: songIDs)
-            s.lastPlaylistID = newID
-            s.targetName = name + " · Sync"
-            s.lastPlaylistName = s.targetName
+            try await client.editOwnPlaylist(id: pending.playlistID, name: pending.name,
+                                             description: "Gestionada por MusicSync", songIDs: pending.songIDs)
+            s.lastPlaylistID = pending.playlistID
+            s.targetName = pending.name
+            s.lastPlaylistName = pending.name
             s.managed = true
-            updateSource(s)
+            try SourceStore.store.update { state in
+                guard let i = state.sources.firstIndex(where: { $0.id == sourceID }) else { throw SyncIntegrityError.stalePreparation }
+                state.sources[i] = s
+                state.pendingAdoptions.removeValue(forKey: key)
+            }
+            load()
             await loadLibraryPlaylists(force: true)
-            return newID
+            return pending.playlistID
         } catch {
             libraryError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             return nil
@@ -158,9 +165,12 @@ final class AppStore {
     /// vacías); se mantiene por si hace falta creación explícita.
     func createLibraryPlaylist(named name: String) async -> LibraryPlaylist? {
         do {
+            let lease = try SourceStore.beginOperation()
+            defer { withExtendedLifetime(lease) {} }
             let id = try await client.createPlaylist(name: name,
                                                      description: "Creada desde MusicSync",
                                                      songIDs: [])
+            try SourceStore.store.update { $0.completedCreations = $0.completedCreations.filter { $0.value != id } }
             let pl = LibraryPlaylist(id: id, name: name, trackCount: 0, isReplaceable: true)
             libraryPlaylists.append(pl)
             libraryPlaylists.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -176,12 +186,18 @@ final class AppStore {
     @discardableResult
     func sync(_ source: SavedSource) async -> SyncRun {
         progress[source.id] = SyncProgress()
-        let run = await syncer.run(source: source) { [weak self] p in
-            Task { @MainActor in self?.progress[source.id] = p }
+        defer { progress[source.id] = nil; load() }
+        do {
+            guard let run = try await SyncService.syncOne(id: source.id.uuidString, progress: { [weak self] p in
+                Task { @MainActor in self?.progress[source.id] = p }
+            }) else { throw SyncIntegrityError.stalePreparation }
+            return run
+        } catch {
+            libraryError = error.localizedDescription
+            return SyncRun(date: Date(), sourceName: source.targetName, sourceURL: source.sourceURL,
+                           targetName: source.targetName, mode: source.mode, matched: 0, totalTracks: 0,
+                           playlistID: source.lastPlaylistID, misses: [], failed: true, errorMessage: error.localizedDescription)
         }
-        progress[source.id] = nil
-        record(run, for: source)
-        return run
     }
 
     func syncAll() async {
@@ -197,19 +213,6 @@ final class AppStore {
                body: fail == 0 ? "\(ok) playlists sincronizadas." : "\(ok) OK, \(fail) con error.")
     }
 
-    private func record(_ run: SyncRun, for source: SavedSource) {
-        history.insert(run, at: 0)
-        persistHistory()
-        if !run.failed, var s = sources.first(where: { $0.id == source.id }) {
-            s.lastPlaylistID = run.playlistID
-            s.lastPlaylistName = run.targetName
-            s.lastSyncedAt = run.date
-            s.lastMatched = run.matched
-            s.lastMissed = run.misses.count
-            updateSource(s)
-        }
-    }
-
     // MARK: Miss resolution
 
     func searchForMiss(_ miss: MissTrack) async -> [CatalogSong] {
@@ -220,19 +223,31 @@ final class AppStore {
 
     /// Add a manually-chosen song to the run's playlist and mark the miss resolved.
     func resolveMiss(_ miss: MissTrack, with song: CatalogSong, in run: SyncRun) async -> Bool {
-        guard let playlistID = run.playlistID else { return false }
+        guard !run.failed, let playlistID = run.playlistID else { return false }
         do {
-            try await client.addTracks(playlistID: playlistID, songIDs: [song.id])
+            let lease = try SourceStore.beginOperation()
+            defer { withExtendedLifetime(lease) {} }
+            let latest = try SourceStore.loadHistory()
+            guard let savedRun = latest.first(where: { $0.id == run.id }),
+                  let savedMiss = savedRun.misses.first(where: { $0.id == miss.id }) else { return false }
+            if savedMiss.resolvedSongID != nil { load(); return true }
+            let existing = try await client.existingCatalogIDs(playlistID: playlistID)
+            if !existing.contains(song.id) {
+                try await client.addTracks(playlistID: playlistID, songIDs: [song.id])
+            }
+            try SourceStore.store.update { state in
+                guard let ri = state.history.firstIndex(where: { $0.id == run.id }),
+                      let mi = state.history[ri].misses.firstIndex(where: { $0.id == miss.id }) else { return }
+                state.history[ri].misses[mi].resolvedSongID = song.id
+                state.history[ri].misses[mi].resolvedTitle = "\(song.title) — \(song.artist)"
+                state.history[ri].matched += 1
+            }
+            load()
+            return true
         } catch {
+            libraryError = error.localizedDescription
             return false
         }
-        guard let ri = history.firstIndex(where: { $0.id == run.id }),
-              let mi = history[ri].misses.firstIndex(where: { $0.id == miss.id }) else { return true }
-        history[ri].misses[mi].resolvedSongID = song.id
-        history[ri].misses[mi].resolvedTitle = "\(song.title) — \(song.artist)"
-        history[ri].matched += 1
-        persistHistory()
-        return true
     }
 
     // MARK: Notifications

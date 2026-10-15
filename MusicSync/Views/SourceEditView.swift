@@ -5,11 +5,15 @@ struct SourceEditView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var draft: SavedSource
+    @State private var baseline: SavedSource
     @State private var lastRun: SyncRun?
     @State private var showPicker = false
     @State private var adopting = false
 
-    init(source: SavedSource) { _draft = State(initialValue: source) }
+    init(source: SavedSource) {
+        _draft = State(initialValue: source)
+        _baseline = State(initialValue: source)
+    }
 
     private var progress: SyncProgress? { store.progress[draft.id] }
 
@@ -32,6 +36,17 @@ struct SourceEditView: View {
         guard let id = draft.lastPlaylistID else { return true }
         guard let pl = store.libraryPlaylists.first(where: { $0.id == id }) else { return true }
         return pl.isReplaceable
+    }
+
+    private func reloadDraft(_ source: SavedSource) {
+        baseline = source
+        draft = source
+    }
+
+    private func saveDraft() {
+        guard draft != baseline else { return }
+        if store.updateSource(draft, expected: baseline) { baseline = draft }
+        else if let saved = store.binding(for: draft.id) { reloadDraft(saved) }
     }
 
     var body: some View {
@@ -62,7 +77,7 @@ struct SourceEditView: View {
                     ForEach(SyncMode.allCases) { Text($0.label).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: draft.mode) { store.updateSource(draft) }
+                .onChange(of: draft.mode) { saveDraft() }
                 Text(modeHelp).font(.caption).foregroundStyle(.secondary)
 
                 if !canReplace, draft.mode == .replace {
@@ -76,7 +91,7 @@ struct SourceEditView: View {
                         Task {
                             if await store.adoptTarget(for: draft.id) != nil,
                                let updated = store.binding(for: draft.id) {
-                                draft = updated
+                                reloadDraft(updated)
                             }
                             adopting = false
                         }
@@ -115,7 +130,7 @@ struct SourceEditView: View {
                     Task {
                         let run = await store.sync(draft)
                         lastRun = run
-                        if let updated = store.binding(for: draft.id) { draft = updated }
+                        if let updated = store.binding(for: draft.id) { reloadDraft(updated) }
                     }
                 } label: {
                     if let progress {
@@ -166,8 +181,14 @@ struct SourceEditView: View {
             ), selectedName: $draft.targetName)
         }
         .onChange(of: draft.lastPlaylistID) {
+            guard draft != baseline else { return }
             draft.lastPlaylistName = draft.targetName
-            store.updateSource(draft)
+            saveDraft()
+        }
+        .onChange(of: draft.targetName) {
+            guard draft != baseline else { return }
+            draft.lastPlaylistName = draft.targetName
+            saveDraft()
         }
         .task { await store.loadLibraryPlaylists() }
     }
@@ -250,12 +271,13 @@ struct AddSourceSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Añadir") {
-                        store.addSource(.init(sourceURL: url,
+                        let saved = store.addSource(.init(sourceURL: url,
                                               targetName: name.isEmpty ? "Nueva playlist" : name,
                                               mode: mode,
                                               lastPlaylistID: targetID,
                                               lastPlaylistName: name.isEmpty ? nil : name))
-                        dismiss()
+                        if saved { dismiss() }
+                        else { error = store.persistenceError }
                     }
                     .disabled(!validURL || targetID == nil)
                 }

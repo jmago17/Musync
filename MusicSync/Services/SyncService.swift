@@ -1,86 +1,51 @@
 import Foundation
 
-/// Headless sync of all configured sources, sharing the same on-disk state and
-/// the same `Syncer` semantics as the UI. Used by the Shortcuts App Intent so a
-/// time-based automation can replace the Mac's weekly LaunchAgent.
 struct SyncService: Sendable {
     struct Summary: Sendable {
-        var ok: Int = 0
-        var failed: Int = 0
-        var matched: Int = 0
-        var playlists: Int = 0
+        var ok = 0
+        var failed = 0
+        var matched = 0
+        var playlists = 0
     }
 
     static func prepareOne(id: String) async throws -> PreparedSync? {
-        guard let source = SourceStore.loadSources().first(where: { $0.id.uuidString == id }) else {
-            return nil
-        }
+        let lease = try SourceStore.beginOperation()
+        defer { withExtendedLifetime(lease) {} }
+        guard let source = try SourceStore.loadSources().first(where: { $0.id.uuidString == id }) else { return nil }
         let prepared = try await Syncer().prepare(source: source) { _ in }
-        SourceStore.savePrepared(prepared)
+        try SourceStore.savePrepared(prepared)
         return prepared
     }
 
     static func applyPrepared(id: UUID) async throws -> SyncRun? {
-        guard let prepared = SourceStore.prepared(id: id) else { return nil }
-        var sources = SourceStore.loadSources()
-        guard let idx = sources.firstIndex(where: { $0.id == prepared.sourceID }) else { return nil }
-        let run = try await Syncer().apply(prepared: prepared, source: sources[idx]) { _ in }
-        var history = SourceStore.loadHistory()
-        history.insert(run, at: 0)
-        sources[idx].lastPlaylistID = run.playlistID
-        sources[idx].lastPlaylistName = run.targetName
-        sources[idx].lastSyncedAt = run.date
-        sources[idx].lastMatched = run.matched
-        sources[idx].lastMissed = run.misses.count
-        SourceStore.saveSources(sources)
-        SourceStore.saveHistory(history)
-        SourceStore.removePrepared(id: id)
+        let lease = try SourceStore.beginOperation()
+        defer { withExtendedLifetime(lease) {} }
+        guard let prepared = try SourceStore.prepared(id: id),
+              let source = try SourceStore.loadSources().first(where: { $0.id == prepared.sourceID }) else { return nil }
+        let run = try await Syncer().apply(prepared: prepared, source: source) { _ in }
+        try SourceStore.record(run, sourceID: source.id, preparedID: id)
         return run
     }
 
-    /// Sync a single configured source by id. Returns nil if not found.
-    static func syncOne(id: String) async -> SyncRun? {
-        var sources = SourceStore.loadSources()
-        guard let idx = sources.firstIndex(where: { $0.id.uuidString == id }) else { return nil }
-        var history = SourceStore.loadHistory()
-        let run = await Syncer().run(source: sources[idx]) { _ in }
-        history.insert(run, at: 0)
-        if !run.failed {
-            sources[idx].lastPlaylistID = run.playlistID
-            sources[idx].lastPlaylistName = run.targetName
-            sources[idx].lastSyncedAt = run.date
-            sources[idx].lastMatched = run.matched
-            sources[idx].lastMissed = run.misses.count
-            SourceStore.saveSources(sources)
-        }
-        SourceStore.saveHistory(history)
+    static func syncOne(id: String, progress: @escaping @Sendable (SyncProgress) -> Void = { _ in }) async throws -> SyncRun? {
+        let lease = try SourceStore.beginOperation()
+        defer { withExtendedLifetime(lease) {} }
+        guard let source = try SourceStore.loadSources().first(where: { $0.id.uuidString == id }) else { return nil }
+        let run = await Syncer().run(source: source, progress: progress)
+        try SourceStore.record(run, sourceID: source.id)
         return run
     }
 
-    static func syncAll() async -> Summary {
-        var sources = SourceStore.loadSources()
-        var history = SourceStore.loadHistory()
-        let syncer = Syncer()
+    static func syncAll() async throws -> Summary {
+        let sources = try SourceStore.loadSources()
         var summary = Summary(playlists: sources.count)
-
-        for i in sources.indices {
-            let run = await syncer.run(source: sources[i]) { _ in }
-            history.insert(run, at: 0)
-            if run.failed {
-                summary.failed += 1
-            } else {
-                summary.ok += 1
-                summary.matched += run.matched
-                sources[i].lastPlaylistID = run.playlistID
-                sources[i].lastPlaylistName = run.targetName
-                sources[i].lastSyncedAt = run.date
-                sources[i].lastMatched = run.matched
-                sources[i].lastMissed = run.misses.count
-            }
+        for source in sources {
+            try Task.checkCancellation()
+            if let run = try await syncOne(id: source.id.uuidString) {
+                if run.failed { summary.failed += 1 }
+                else { summary.ok += 1; summary.matched += run.matched }
+            } else { summary.failed += 1 }
         }
-
-        SourceStore.saveSources(sources)
-        SourceStore.saveHistory(history)
         return summary
     }
 }

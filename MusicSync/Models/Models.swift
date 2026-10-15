@@ -83,6 +83,7 @@ struct CatalogSong: Codable, Hashable, Identifiable, Sendable {
     var title: String
     var artist: String
     var artworkURL: String?
+    var isrc: String? = nil
 }
 
 // MARK: - Prepared shortcut sync (persisted hand-off)
@@ -99,6 +100,8 @@ struct PreparedSync: Identifiable, Codable, Hashable, Sendable {
     var songIDs: [String]
     var totalTracks: Int
     var misses: [MissTrack]
+    var storefront: String? = nil
+    var sourceSnapshot: SavedSource? = nil
 }
 
 // MARK: - Sync run history (persisted)

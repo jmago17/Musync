@@ -6,7 +6,7 @@ import MusicKit
 ///
 /// Mirrors the endpoints of the original `apple-music-sync` Python CLI, but with
 /// framework-managed tokens — no scraped JWT, no pasted media-user-token.
-struct AppleMusicClient: Sendable {
+struct AppleMusicClient: MusicSyncClient {
 
     static let host = "https://api.music.apple.com"
 
@@ -43,6 +43,8 @@ struct AppleMusicClient: Sendable {
                          path: String,
                          query: [URLQueryItem]? = nil,
                          body: Data? = nil) async throws -> Data {
+        try Task.checkCancellation()
+        guard path.hasPrefix("/v1/") else { throw ClientError.badURL(path) }
         guard var comps = URLComponents(string: Self.host + path) else {
             throw ClientError.badURL(path)
         }
@@ -62,6 +64,8 @@ struct AppleMusicClient: Sendable {
         do {
             let response = try await dataRequest.response()
             return response.data
+        } catch is CancellationError {
+            throw CancellationError()
         } catch let error as MusicDataRequest.Error {
             let msg = [error.title, error.detailText].compactMap { $0 }.joined(separator: " — ")
             throw ClientError.http(error.status, "\(method) \(path): \(msg.isEmpty ? error.localizedDescription : msg)")
@@ -82,7 +86,10 @@ struct AppleMusicClient: Sendable {
     private func getJSON<T: Decodable>(_ type: T.Type,
                                        path: String,
                                        query: [URLQueryItem]? = nil) async throws -> T {
-        let data = try await rawData(method: "GET", path: path, query: query)
+        let data = try await ReadRetry.data(request: { try await rawData(method: "GET", path: path, query: query) }, status: { error in
+            if case ClientError.http(let status, _) = error { return status }
+            return nil
+        })
         return try decode(type, data, context: path)
     }
 
@@ -134,13 +141,15 @@ struct AppleMusicClient: Sendable {
         var tracks: [SourceTrack] = []
         var nextPath: String? = "/v1/catalog/\(sf)/playlists/\(id)/tracks"
         var firstQuery: [URLQueryItem]? = [URLQueryItem(name: "limit", value: "100")]
+        var cursor = PageCursor()
         while let path = nextPath {
+            try cursor.visit(path)
             let page = try await getJSON(TracksPage.self, path: path, query: firstQuery)
             firstQuery = nil
             for t in page.data {
-                guard let a = t.attributes else { continue }
-                tracks.append(SourceTrack(title: a.name ?? "",
-                                          artist: a.artistName ?? "",
+                guard t.type == "songs", let a = t.attributes, let name = a.name, let artist = a.artistName else { throw SyncIntegrityError.incompleteSource }
+                tracks.append(SourceTrack(title: name,
+                                          artist: artist,
                                           isrc: a.isrc,
                                           srcID: t.id))
             }
@@ -160,8 +169,10 @@ struct AppleMusicClient: Sendable {
             }
         }
         // 2) Direct id lookup (Apple often shares ids across storefronts).
-        if let song = try? await songByID(track.srcID, storefront: storefront) {
-            return song
+        do {
+            if let song = try await songByID(track.srcID, storefront: storefront) { return song }
+        } catch ClientError.http(let code, _) where code == 404 {
+            // Only a missing resource permits a search fallback.
         }
         // 3) Search fallback, ranked by artist/title.
         let term = "\(track.title) \(track.artist)".trimmingCharacters(in: .whitespaces)
@@ -194,13 +205,39 @@ struct AppleMusicClient: Sendable {
     }
 
     private func rank(_ hits: [CatalogSong], title: String, artist: String) -> CatalogSong? {
-        let ta = artist.lowercased(), tt = title.lowercased()
-        if let exact = hits.first(where: { $0.artist.lowercased() == ta && $0.title.lowercased() == tt }) {
-            return exact
-        }
-        if let byArtist = hits.first(where: { $0.artist.lowercased() == ta }) { return byArtist }
-        return hits.first
+        SyncAlgorithms.strictMatch(hits, title: title, artist: artist)
     }
+
+    func equivalents(ids: [String], storefront: String) async throws -> [String: CatalogSong] {
+        var matches: [String: CatalogSong] = [:]
+        if #available(iOS 27, *) {
+            for chunk in ids.chunked(100) {
+                try Task.checkCancellation()
+                var request = MusicCatalogResourceRequest<Song>(matching: \.id, memberOf: chunk.map { MusicItemID($0) })
+                request.options = [.findEquivalents]
+                request.limit = chunk.count
+                let response = try await request.response()
+                guard !response.items.hasNextBatch else { throw SyncIntegrityError.incompleteCatalog }
+                for id in chunk {
+                    if let song = response.item(for: MusicItemID(id)) { matches[id] = Self.catalogSong(song) }
+                }
+            }
+        } else {
+            for chunk in ids.chunked(100) {
+                let response = try await getJSON(EquivalentSongsResponse.self,
+                    path: "/v1/catalog/\(storefront)/songs",
+                    query: [URLQueryItem(name: "filter[equivalents]", value: chunk.joined(separator: ","))])
+                matches.merge(try response.matches(requested: chunk)) { _, new in new }
+            }
+        }
+        return matches
+    }
+
+    private static func catalogSong(_ song: Song) -> CatalogSong {
+        CatalogSong(id: song.id.rawValue, title: song.title, artist: song.artistName, artworkURL: nil, isrc: song.isrc)
+    }
+
+    func ownsPlaylist(_ id: String) throws -> Bool { try CreatedPlaylists.contains(id) }
 
     // MARK: Library playlists
 
@@ -208,13 +245,8 @@ struct AppleMusicClient: Sendable {
         try await libraryPlaylistsDetailed().map { ($0.id, $0.name) }
     }
 
-    /// Todas las playlists de la biblioteca, con metadatos suficientes para
-    /// mostrarlas en un selector de destino.
-    ///
-    /// `canEdit` (REST) indica si la playlist admite añadir pistas. Además
-    /// consultamos vía MusicKit `isEditable`, que es lo que de verdad determina
-    /// si `MusicLibrary.edit` puede reemplazar su contenido (solo playlists
-    /// creadas por esta app).
+    /// Library listing uses native MusicKit; local provenance is only an edit
+    /// eligibility hint, and the framework remains authoritative on mutation.
     func libraryPlaylistsDetailed() async throws -> [LibraryPlaylist] {
         // Use MusicKit's native library API. Unlike a hand-built `/v1/me/...`
         // MusicDataRequest, this is the documented path for the library granted
@@ -223,12 +255,13 @@ struct AppleMusicClient: Sendable {
         request.limit = 100
         var batch = try await request.response().items
         var playlists = Array(batch)
-        while batch.hasNextBatch, let next = try await batch.nextBatch(limit: 100) {
+        while batch.hasNextBatch {
+            guard let next = try await batch.nextBatch(limit: 100) else { throw SyncIntegrityError.incompleteCatalog }
             playlists.append(contentsOf: next)
             batch = next
         }
 
-        let owned = CreatedPlaylists.ids
+        let owned = try CreatedPlaylists.ids
         return playlists.map {
             LibraryPlaylist(id: $0.id.rawValue,
                             name: $0.name,
@@ -251,10 +284,11 @@ struct AppleMusicClient: Sendable {
 
     func findPlaylist(named name: String) async throws -> String? {
         let all = try await libraryPlaylists()
-        if let exact = all.first(where: { $0.name == name })?.id { return exact }
         let target = Self.normalizedName(name)
         guard !target.isEmpty else { return nil }
-        return all.first(where: { Self.normalizedName($0.name) == target })?.id
+        let candidates = all.filter { Self.normalizedName($0.name) == target }
+        guard candidates.count <= 1 else { throw SyncIntegrityError.ambiguousDestination }
+        return candidates.first?.id
     }
 
     func playlistExists(_ id: String) async throws -> Bool {
@@ -272,12 +306,12 @@ struct AppleMusicClient: Sendable {
         let body = CreatePlaylistBody(
             attributes: .init(name: name, description: description),
             relationships: .init(tracks: .init(data: initial.map { .init(id: $0) })))
-        let data = try await rawData(method: "POST",
-                                     path: "/v1/me/library/playlists",
-                                     body: try JSONEncoder().encode(body))
-        let resp = try decode(DataArray<EmptyAttrs>.self, data, context: "POST /v1/me/library/playlists")
-        guard let pid = resp.data.first?.id else { throw ClientError.decode("sin id de playlist") }
-        CreatedPlaylists.remember(pid)
+        let pid = try await PlaylistCreator(store: SourceStore.store).create(name: name, description: description, request: {
+            let data = try await rawData(method: "POST", path: "/v1/me/library/playlists", body: try JSONEncoder().encode(body))
+            let response = try decode(DataArray<EmptyAttrs>.self, data, context: "POST /v1/me/library/playlists")
+            guard let id = response.data.first?.id else { throw ClientError.decode("sin id de playlist") }
+            return id
+        }, wasRejected: { Self.wasRejected($0) })
         if !rest.isEmpty { try await addTracks(playlistID: pid, songIDs: rest) }
         return pid
     }
@@ -290,39 +324,42 @@ struct AppleMusicClient: Sendable {
     /// Lanza si la playlist la creó otra app (p. ej. la app Música): en ese caso
     /// Apple no permite editarla desde aquí por ninguna API pública.
     func editOwnPlaylist(id: String, name: String, description: String, songIDs: [String]) async throws {
-        let all = try await MusicLibraryRequest<Playlist>().response().items
-        guard let playlist = all.first(where: { $0.id.rawValue == id }) else {
-            throw ClientError.notEditable("la playlist ya no está en tu biblioteca")
+        var request = MusicLibraryRequest<Playlist>()
+        request.filter(matching: \.id, equalTo: MusicItemID(id))
+        guard let playlist = try await request.response().items.first else {
+            throw ClientError.notEditable("La playlist todavía no está disponible en la biblioteca. Reintenta cuando termine de sincronizarse.")
         }
         var songs: [Song] = []
-        for chunk in songIDs.chunked(25) {
-            let r = MusicCatalogResourceRequest<Song>(matching: \.id,
-                                                      memberOf: chunk.map { MusicItemID($0) })
-            songs.append(contentsOf: try await r.response().items)
+        for chunk in SyncAlgorithms.unique(songIDs).chunked(25) {
+            let request = MusicCatalogResourceRequest<Song>(matching: \.id,
+                                                           memberOf: chunk.map { MusicItemID($0) })
+            var batch = try await request.response().items
+            songs.append(contentsOf: batch)
+            while batch.hasNextBatch {
+                guard let next = try await batch.nextBatch(limit: 25) else { throw SyncIntegrityError.incompleteCatalog }
+                songs.append(contentsOf: next)
+                batch = next
+            }
         }
-        // Reordena según el orden del origen.
-        let order = Dictionary(uniqueKeysWithValues: songIDs.enumerated().map { ($1, $0) })
-        songs.sort { (order[$0.id.rawValue] ?? 0) < (order[$1.id.rawValue] ?? 0) }
-
-        do {
-            _ = try await MusicLibrary.shared.edit(playlist,
-                                                   name: name,
-                                                   description: description,
-                                                   items: songs)
-        } catch {
-            // `MusicLibrary.edit` falla si la playlist la creó otra app.
-            throw ClientError.notEditable(
-                "No se puede reemplazar el contenido de «\(playlist.name)»: Apple solo permite editar playlists creadas por MusicSync. Cambia el modo a «Añadir» o elige otro destino.")
-        }
+        let ordered = try SyncAlgorithms.ordered(songIDs, resources: songs) { $0.id.rawValue }
+        try Task.checkCancellation()
+        _ = try await MusicLibrary.shared.edit(playlist, name: name, description: description, items: ordered)
+        try SourceStore.store.update { $0.pendingAppends.removeValue(forKey: id) }
     }
 
     func addTracks(playlistID: String, songIDs: [String]) async throws {
-        for chunk in songIDs.chunked(50) {
-            let body = TrackDataBody(data: chunk.map { .init(id: $0) })
-            _ = try await rawData(method: "POST",
-                                  path: "/v1/me/library/playlists/\(playlistID)/tracks",
-                                  body: try JSONEncoder().encode(body))
-        }
+        try await PlaylistAppender(store: SourceStore.store).append(playlistID: playlistID, ids: songIDs,
+            existingIDs: { try await existingCatalogIDs(playlistID: playlistID) },
+            write: { chunk in
+                let body = TrackDataBody(data: chunk.map { SongRef(id: $0) })
+                _ = try await rawData(method: "POST", path: "/v1/me/library/playlists/\(playlistID)/tracks",
+                                      body: try JSONEncoder().encode(body))
+            }, wasRejected: { Self.wasRejected($0) })
+    }
+
+    private static func wasRejected(_ error: Error) -> Bool {
+        if case ClientError.http(let status, _) = error { return [400, 401, 403, 404, 405, 409, 422, 429].contains(status) }
+        return false
     }
 
     /// Catalog ids already present in a library playlist, for dedupe on append.
@@ -340,18 +377,16 @@ struct AppleMusicClient: Sendable {
             URLQueryItem(name: "limit", value: "100"),
             URLQueryItem(name: "include", value: "catalog"),
         ]
+        var cursor = PageCursor()
         while let p = path {
-            do {
-                let page = try await getJSON(LibraryTracksPage.self, path: p, query: query)
-                query = nil
-                for t in page.data {
-                    guard let c = t.relationships?.catalog?.data.first else { continue }
-                    out.append((c.id, t.attributes?.name ?? "", t.attributes?.artistName ?? ""))
-                }
-                path = page.next
-            } catch ClientError.http(let code, _) where code == 404 {
-                return out
+            try cursor.visit(p)
+            let page = try await getJSON(LibraryTracksPage.self, path: p, query: query)
+            query = nil
+            for t in page.data {
+                guard let c = t.relationships?.catalog?.data.first else { throw SyncIntegrityError.incompleteCatalog }
+                out.append((c.id, t.attributes?.name ?? "", t.attributes?.artistName ?? ""))
             }
+            path = page.next
         }
         return out
     }
@@ -365,6 +400,7 @@ private struct DataArray<A: Decodable>: Decodable {
 }
 private struct Resource<A: Decodable>: Decodable {
     let id: String
+    let type: String?
     let attributes: A?
 }
 private struct StorefrontAttrs: Decodable {}
@@ -389,7 +425,7 @@ private extension Resource where A == SongAttrs {
         return CatalogSong(id: id,
                            title: a.name ?? "",
                            artist: a.artistName ?? "",
-                           artworkURL: a.artwork?.url)
+                           artworkURL: a.artwork?.url, isrc: a.isrc)
     }
 }
 
@@ -435,9 +471,10 @@ private struct SongRef: Encodable {
     init(id: String) { self.id = id }
 }
 
-extension Array {
-    func chunked(_ size: Int) -> [[Element]] {
-        guard size > 0 else { return [self] }
-        return stride(from: 0, to: count, by: size).map { Array(self[$0..<Swift.min($0 + size, count)]) }
+extension Syncer {
+    init() {
+        self.init(client: AppleMusicClient(), checkpoint: { source, id in
+            try SourceStore.checkpoint(source: source, playlistID: id)
+        })
     }
 }

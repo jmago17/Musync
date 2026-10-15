@@ -7,7 +7,7 @@ portal de Apple Developer, y el token de desarrollador lo emite Apple
 automáticamente en tiempo de ejecución (no hay que generar ni firmar ninguna clave,
 a diferencia de MusicKit JS para web).
 
-- **Bundle ID:** `com.jmago17.MusicSync`
+- **Bundle ID:** `smargon.com.Musync`
 - **Cuenta:** jmago17 (Apple Developer Program de pago — requerido)
 - **Requiere** un dispositivo con **suscripción activa a Apple Music** para probar
   (sobre todo la escritura en biblioteca). El simulador no autoriza MusicKit de
@@ -20,8 +20,8 @@ a diferencia de MusicKit JS para web).
 1. Entra en <https://developer.apple.com/account> → **Certificates, Identifiers & Profiles** → **Identifiers**.
 2. Si el App ID no existe aún:
    - Pulsa **+** → **App IDs** → **App** → **Continue**.
-   - **Description:** MusicSync · **Bundle ID:** *Explicit* → `com.jmago17.MusicSync`.
-3. Abre el App ID `com.jmago17.MusicSync` para editarlo.
+   - **Description:** MusicSync · **Bundle ID:** *Explicit* → `smargon.com.Musync`.
+3. Abre el App ID `smargon.com.Musync` para editarlo.
 4. Baja a la sección **App Services** (no "Capabilities") y marca **MusicKit**.
 5. **Save**. Confirma el diálogo.
 
@@ -41,7 +41,7 @@ expone.)
 
 El proyecto está generado "pelado" (con el gem `xcodeproj`), sin equipo de firma.
 
-1. Abre `~/Documents/Developer/MusicSync/MusicSync.xcodeproj` en Xcode.
+1. Abre `~/Developer/MusicSync/MusicSync.xcodeproj` en Xcode.
 2. Target **MusicSync** → **Signing & Capabilities**:
    - **Team:** tu equipo (jmago17).
    - **Automatically manage signing:** ✔.
