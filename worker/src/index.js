@@ -103,7 +103,9 @@ export class AppleMusic {
     for (let attempt = 0; attempt < 3; attempt++) {
       if (this.requests >= this.limit) throw new Error("Presupuesto de subrequests agotado (" + this.limit + ")");
       this.requests++;
-      const res = await this.fetchImpl(url, { headers: { Authorization: "Bearer " + this.token } });
+      // Sin `this`: llamar a fetch como método de otro objeto lanza "Illegal invocation" en Workers.
+      const doFetch = this.fetchImpl;
+      const res = await doFetch(url, { headers: { Authorization: "Bearer " + this.token } });
       if (res.status === 429 || res.status >= 500) {
         const ra = Number(res.headers.get("retry-after"));
         await sleep(Number.isFinite(ra) && ra > 0 ? Math.min(ra, 10) * 1000 : 1000 * (attempt + 1));
