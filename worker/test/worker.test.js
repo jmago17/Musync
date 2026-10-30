@@ -28,7 +28,9 @@ async function makeEnv() {
 // Apple simulado: ES tiene 5 canciones (en 2 páginas). Equivalentes en US: 1→1, 2→2, 3→33 (otro ID),
 // 4 y 5 sin equivalente; 5 existe por ISRC como 55; 4 no existe. La respuesta de equivalentes va desordenada a propósito.
 function fakeApple(calls) {
-  return async (url) => {
+  return async function (url) {
+    // Como el fetch real de Workers: falla si se invoca con un `this` ajeno.
+    if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
     const u = String(url);
     calls.push(u);
     const ok = (body) => new Response(JSON.stringify(body), { status: 200 });
