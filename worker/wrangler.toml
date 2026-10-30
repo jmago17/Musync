@@ -1,0 +1,13 @@
+name = "musync"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[triggers]
+# Diario a las 06:00 UTC y refuerzo los viernes a las 11:00 UTC.
+crons = ["0 6 * * *", "0 11 * * 5"]
+
+[[kv_namespaces]]
+binding = "MUSYNC"
+id = "REPLACE_WITH_KV_ID"
+
+# Secrets (wrangler secret put ...): APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY, API_TOKEN
