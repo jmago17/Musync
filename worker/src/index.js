@@ -214,6 +214,7 @@ export function buildDocument({ entry, source, matches, previous, now }) {
       match: m.how,
       sourceId: m.track.id,
       url: a.url,
+      term: [a.name, a.artistName].filter(Boolean).join(" "), // para "Buscar en iTunes Store" en Atajos
       lookup: "https://itunes.apple.com/lookup?id=" + m.song.id + "&country=" + entry.target,
     });
   }
