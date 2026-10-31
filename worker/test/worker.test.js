@@ -89,6 +89,7 @@ test("flujo completo: config, run, lectura y diff", async () => {
   assert.equal(doc.revision, 1);
   assert.deepEqual(doc.added, ["1", "2", "33", "55"]);
   assert.deepEqual(doc.notFound.map((n) => n.sourceId), ["4"]);
+  assert.equal(doc.songs[0].term, "One A1");
   assert.match(doc.songs[0].lookup, /itunes\.apple\.com\/lookup\?id=1&country=us/);
   assert.ok(calls.some((c) => c.includes("filter[equivalents]=1,2,3,4,5")));
   assert.ok(calls.some((c) => c.includes("filter[isrc]=I4,I5")));
