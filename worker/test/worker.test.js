@@ -133,3 +133,46 @@ test("searchTerm limpia comillas, paréntesis, corchetes y artistas múltiples",
   assert.equal(searchTerm("(Intro)", "X"), "Intro X");
   assert.equal(searchTerm(undefined, undefined), "");
 });
+
+test("/auth exige ?k= y sirve la página con MusicKit JS y un developer token", async () => {
+  const { env } = await makeEnv();
+  const get = (path) => handleRequest(new Request("https://w.test" + path), env);
+  assert.equal((await get("/auth")).status, 401);
+  assert.equal((await get("/auth?k=mal")).status, 401);
+  const ok = await get("/auth?k=secret");
+  assert.equal(ok.status, 200);
+  const html = await ok.text();
+  assert.match(html, /musickit\/v3\/musickit\.js/);
+  assert.match(html, /"eyJ[\w-]+\.[\w-]+\.[\w-]+"/); // JWT embebido
+  assert.match(ok.headers.get("content-type"), /text\/html/);
+});
+
+test("user-token: se guarda, no se devuelve y /v1/library/check lo usa", async () => {
+  const { env } = await makeEnv();
+  const seen = [];
+  const fetchImpl = async function (url, opts) {
+    if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
+    seen.push([String(url), opts.headers["Music-User-Token"]]);
+    const u = String(url);
+    const ok = (b) => new Response(JSON.stringify(b), { status: 200 });
+    if (u.includes("/v1/me/storefront")) return ok({ data: [{ id: "us" }] });
+    if (u.includes("/v1/me/library/playlists")) return ok({ data: [{ id: "p.1", attributes: { name: "Mix", canEdit: false } }, { id: "p.2", attributes: { name: "Hecha por API", canEdit: true } }] });
+    return new Response("{}", { status: 404 });
+  };
+  const call = (method, path, body, token = "secret") =>
+    handleRequest(new Request("https://w.test" + path, { method, headers: { authorization: "Bearer " + token }, body: body && JSON.stringify(body) }), env, { fetchImpl });
+
+  assert.equal((await call("GET", "/v1/library/check")).status, 409); // sin token todavía
+  assert.equal((await call("PUT", "/v1/user-token", { token: "corto" })).status, 400);
+  const userToken = "U".repeat(40);
+  assert.equal((await call("PUT", "/v1/user-token", { token: userToken })).status, 200);
+  const status = await (await call("GET", "/v1/user-token")).json();
+  assert.equal(status.saved, true);
+  assert.ok(!JSON.stringify(status).includes(userToken));
+  assert.equal((await call("PUT", "/v1/user-token", { token: userToken }, "mal")).status, 401);
+
+  const chk = await (await call("GET", "/v1/library/check")).json();
+  assert.equal(chk.storefront, "us");
+  assert.deepEqual(chk.playlists.map((p) => [p.name, p.canEdit]), [["Mix", false], ["Hecha por API", true]]);
+  assert.ok(seen.length === 2 && seen.every(([, h]) => h === userToken));
+});

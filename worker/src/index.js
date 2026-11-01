@@ -88,8 +88,9 @@ export class AppleError extends Error {
 }
 
 export class AppleMusic {
-  constructor(token, { fetchImpl = fetch, limit = 45 } = {}) {
+  constructor(token, { fetchImpl = fetch, limit = 45, userToken } = {}) {
     this.token = token;
+    this.userToken = userToken; // Music User Token: necesario para /v1/me/* (biblioteca del usuario)
     this.fetchImpl = fetchImpl;
     this.limit = limit; // el plan gratis permite 50 subrequests externas por ejecución
     this.requests = 0;
@@ -105,7 +106,9 @@ export class AppleMusic {
       this.requests++;
       // Sin `this`: llamar a fetch como método de otro objeto lanza "Illegal invocation" en Workers.
       const doFetch = this.fetchImpl;
-      const res = await doFetch(url, { headers: { Authorization: "Bearer " + this.token } });
+      const headers = { Authorization: "Bearer " + this.token };
+      if (this.userToken) headers["Music-User-Token"] = this.userToken;
+      const res = await doFetch(url, { headers });
       if (res.status === 429 || res.status >= 500) {
         const ra = Number(res.headers.get("retry-after"));
         await sleep(Number.isFinite(ra) && ra > 0 ? Math.min(ra, 10) * 1000 : 1000 * (attempt + 1));
@@ -326,10 +329,7 @@ const json = (body, status = 200) =>
     headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
   });
 
-async function authorized(request, env) {
-  const given = request.headers.get("authorization") ?? "";
-  const expected = "Bearer " + (env.API_TOKEN ?? "");
-  if (!env.API_TOKEN) return false;
+async function sameSecret(given, expected) {
   const [a, b] = await Promise.all(
     [given, expected].map(async (s) => new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(s)))),
   );
@@ -338,11 +338,102 @@ async function authorized(request, env) {
   return diff === 0;
 }
 
+async function authorized(request, env) {
+  if (!env.API_TOKEN) return false;
+  return sameSecret(request.headers.get("authorization") ?? "", "Bearer " + env.API_TOKEN);
+}
+
+const MUSICKIT_JS = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
+
+/** Página que obtiene el Music User Token con MusicKit JS y lo guarda en el Worker. */
+export function authPage(developerToken, apiToken) {
+  return [
+    '<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">',
+    "<title>Musync · autorizar</title>",
+    "<style>body{font:17px -apple-system,system-ui,sans-serif;margin:2rem;max-width:34rem}button{font-size:1.1rem;padding:.8rem 1.2rem}pre{white-space:pre-wrap}</style>",
+    "<h1>Musync</h1><p>Autoriza el acceso a tu biblioteca de Apple Music. Solo hace falta una vez.</p>",
+    '<button id="go" disabled>Cargando…</button><pre id="log"></pre>',
+    '<script src="' + MUSICKIT_JS + '" async></script>',
+    "<script>",
+    "const DEV = " + JSON.stringify(developerToken) + "; const KEY = " + JSON.stringify(apiToken) + ";",
+    'const log = (m) => { document.getElementById("log").textContent += m + "\\n"; };',
+    'const btn = document.getElementById("go");',
+    'document.addEventListener("musickitloaded", async () => {',
+    '  try { await MusicKit.configure({ developerToken: DEV, app: { name: "Musync", build: "1" } }); btn.disabled = false; btn.textContent = "Autorizar con Apple Music"; }',
+    '  catch (e) { log("Error al configurar MusicKit: " + e); }',
+    "});",
+    "btn.onclick = async () => {",
+    "  try {",
+    "    const token = await MusicKit.getInstance().authorize();",
+    '    log("Autorizado. Guardando…");',
+    '    const r = await fetch("/v1/user-token", { method: "PUT", headers: { Authorization: "Bearer " + KEY, "content-type": "application/json" }, body: JSON.stringify({ token }) });',
+    '    log("Guardado: HTTP " + r.status + " " + (await r.text()));',
+    '  } catch (e) { log("Error: " + e); }',
+    "};",
+    "</script></html>",
+  ].join("\n");
+}
+
+const mintToken = (env) =>
+  makeDeveloperToken({ teamId: env.APPLE_TEAM_ID, keyId: env.APPLE_KEY_ID, privateKey: env.APPLE_PRIVATE_KEY });
+
 export async function handleRequest(request, env, { fetchImpl = fetch } = {}) {
-  if (!(await authorized(request, env))) return json({ error: "unauthorized" }, 401);
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, "");
   const method = request.method;
+
+  // /auth se abre en el navegador, así que lleva el token en la query (?k=...).
+  if (path === "/auth" && method === "GET") {
+    const k = url.searchParams.get("k") ?? "";
+    if (!env.API_TOKEN || !(await sameSecret(k, env.API_TOKEN))) return new Response("unauthorized", { status: 401 });
+    let dev;
+    try {
+      dev = await mintToken(env);
+    } catch (err) {
+      return new Response("No se pudo crear el developer token: " + err.message, { status: 500 });
+    }
+    return new Response(authPage(dev, k), {
+      headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+    });
+  }
+
+  if (!(await authorized(request, env))) return json({ error: "unauthorized" }, 401);
+
+  if (path === "/v1/user-token") {
+    if (method === "PUT") {
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return json({ error: "JSON inválido" }, 400);
+      }
+      if (typeof body?.token !== "string" || body.token.length < 20) return json({ error: "Falta 'token'" }, 400);
+      await env.MUSYNC.put("user-token", JSON.stringify({ token: body.token, savedAt: new Date().toISOString() }));
+      return json({ ok: true });
+    }
+    if (method === "GET") {
+      const ut = await env.MUSYNC.get("user-token", "json");
+      return json({ saved: Boolean(ut?.token), savedAt: ut?.savedAt ?? null }); // nunca devuelve el token
+    }
+  }
+
+  // Comprueba que el Music User Token funciona y lista las playlists de la biblioteca (con canEdit).
+  if (path === "/v1/library/check" && method === "GET") {
+    const ut = await env.MUSYNC.get("user-token", "json");
+    if (!ut?.token) return json({ error: "Sin Music User Token: abre /auth" }, 409);
+    try {
+      const am = new AppleMusic(await mintToken(env), { fetchImpl, userToken: ut.token });
+      const sf = await am.get("/v1/me/storefront");
+      const pls = await am.get("/v1/me/library/playlists", { limit: 100 });
+      return json({
+        storefront: sf?.data?.[0]?.id ?? null,
+        playlists: (pls?.data ?? []).map((p) => ({ id: p.id, name: p.attributes?.name, canEdit: p.attributes?.canEdit })),
+        more: Boolean(pls?.next),
+      });
+    } catch (err) {
+      return json({ error: err.message }, 502);
+    }
+  }
 
   if (path === "/v1/config") {
     if (method === "GET") return json((await env.MUSYNC.get("config", "json")) ?? { playlists: [] });
