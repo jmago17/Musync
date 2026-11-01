@@ -191,6 +191,28 @@ export async function matchToTarget(am, tracks, target) {
   });
 }
 
+// ---------- Término de búsqueda ----------
+
+const cleanText = (str) =>
+  String(str ?? "")
+    .replace(/[\u2018\u2019'`]/g, "") // apóstrofos: Auli'i -> Aulii
+    .replace(/[^\p{L}\p{N}\s]/gu, " ") // comillas, paréntesis, barras, & ...: fuera
+    .replace(/\s+/g, " ")
+    .trim();
+
+/**
+ * Término para "Buscar en iTunes Store": título sin paréntesis/corchetes (remasterizado, "De ...",
+ * feat. ...) ni signos raros, más el primer artista. Las comillas dobles y similares hacían
+ * fallar la acción de Atajos ("los datos no tienen el formato correcto").
+ */
+export function searchTerm(title, artist) {
+  const rawTitle = String(title ?? "");
+  const noGroups = rawTitle.replace(/\([^)]*\)|\[[^\]]*\]/g, " ");
+  const t = cleanText(noGroups) || cleanText(rawTitle);
+  const first = String(artist ?? "").split(/,| & | y | feat\.| ft\.| con /i)[0];
+  return [t, cleanText(first)].filter(Boolean).join(" ");
+}
+
 // ---------- Documento JSON ----------
 
 export function buildDocument({ entry, source, matches, previous, now }) {
@@ -214,7 +236,7 @@ export function buildDocument({ entry, source, matches, previous, now }) {
       match: m.how,
       sourceId: m.track.id,
       url: a.url,
-      term: [a.name, a.artistName].filter(Boolean).join(" "), // para "Buscar en iTunes Store" en Atajos
+      term: searchTerm(a.name, a.artistName), // para "Buscar en iTunes Store" en Atajos
       lookup: "https://itunes.apple.com/lookup?id=" + m.song.id + "&country=" + entry.target,
     });
   }
