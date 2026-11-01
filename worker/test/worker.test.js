@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import {
-  parsePlaylistRef, normalizeEntry, makeDeveloperToken, AppleMusic, runAll, handleRequest,
+  parsePlaylistRef, normalizeEntry, makeDeveloperToken, AppleMusic, runAll, handleRequest, searchTerm,
 } from "../src/index.js";
 
 const kv = () => {
@@ -122,4 +122,14 @@ test("token inválido se reporta sin romper", async () => {
   await env.MUSYNC.put("config", JSON.stringify({ playlists: ["https://music.apple.com/es/playlist/x/pl.abc"] }));
   const status = await runAll(env, { fetchImpl: fakeApple([]) });
   assert.match(status.results[0].error, /Developer token/);
+});
+
+test("searchTerm limpia comillas, paréntesis, corchetes y artistas múltiples", () => {
+  assert.equal(searchTerm('Espero que se cumpla (De "Blancanieves")', "Anabel García"), "Espero que se cumpla Anabel García");
+  assert.equal(searchTerm('How Far I\'ll Go (From "Moana"/Soundtrack Version)', "Auli'i Cravalho & Disney"), "How Far Ill Go Aulii Cravalho");
+  assert.equal(searchTerm("Al final (versión de créditos finales) [feat. Te Vaka]", "Emilia"), "Al final Emilia");
+  assert.equal(searchTerm("Volaré", "Jim Sutherland, Eamon Doorley & Julie Fowlis"), "Volaré Jim Sutherland");
+  assert.equal(searchTerm("¡Qué Festín!", "Miguel Ángel Jenner, Marta Martorell & Coro"), "Qué Festín Miguel Ángel Jenner");
+  assert.equal(searchTerm("(Intro)", "X"), "Intro X");
+  assert.equal(searchTerm(undefined, undefined), "");
 });
